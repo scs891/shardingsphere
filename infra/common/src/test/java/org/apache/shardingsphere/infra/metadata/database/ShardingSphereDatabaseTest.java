@@ -23,10 +23,9 @@ import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
 import org.apache.shardingsphere.infra.instance.InstanceContext;
 import org.apache.shardingsphere.infra.metadata.database.resource.ResourceMetaData;
 import org.apache.shardingsphere.infra.metadata.database.rule.RuleMetaData;
+import org.apache.shardingsphere.infra.metadata.database.schema.model.ShardingSphereSchema;
 import org.apache.shardingsphere.infra.rule.ShardingSphereRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.DataSourceContainedRule;
 import org.apache.shardingsphere.infra.rule.identifier.type.MutableDataNodeRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.TableContainedRule;
 import org.apache.shardingsphere.infra.spi.type.typed.TypedSPILoader;
 import org.apache.shardingsphere.test.fixture.jdbc.MockedDataSource;
 import org.apache.shardingsphere.test.mock.AutoMockExtension;
@@ -39,13 +38,16 @@ import org.mockito.quality.Strictness;
 import java.sql.SQLException;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Properties;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
@@ -56,37 +58,101 @@ import static org.mockito.Mockito.mock;
 class ShardingSphereDatabaseTest {
     
     @Test
+    void assertContainsSchema() {
+        DatabaseType databaseType = mock(DatabaseType.class);
+        RuleMetaData ruleMetaData = mock(RuleMetaData.class);
+        Map<String, ShardingSphereSchema> schemas = new HashMap<>();
+        ShardingSphereSchema schema = mock(ShardingSphereSchema.class);
+        schemas.put("schema1", schema);
+        ShardingSphereDatabase database = new ShardingSphereDatabase("foo_db", databaseType, mock(ResourceMetaData.class), ruleMetaData, schemas);
+        assertTrue(database.containsSchema("schema1"));
+        assertFalse(database.containsSchema("non_existent_schema"));
+    }
+    
+    @Test
+    void assertGetSchema() {
+        DatabaseType databaseType = mock(DatabaseType.class);
+        RuleMetaData ruleMetaData = mock(RuleMetaData.class);
+        Map<String, ShardingSphereSchema> schemas = new HashMap<>();
+        ShardingSphereSchema schema = mock(ShardingSphereSchema.class);
+        schemas.put("schema1", schema);
+        ShardingSphereDatabase database = new ShardingSphereDatabase("foo_db", databaseType, mock(ResourceMetaData.class), ruleMetaData, schemas);
+        assertThat(database.getSchema("schema1"), is(schema));
+        assertNull(database.getSchema("non_existent_schema"));
+    }
+    
+    @Test
+    void assertAddSchema() {
+        DatabaseType databaseType = mock(DatabaseType.class);
+        RuleMetaData ruleMetaData = mock(RuleMetaData.class);
+        Map<String, ShardingSphereSchema> schemas = new HashMap<>();
+        ShardingSphereSchema schema = mock(ShardingSphereSchema.class);
+        ShardingSphereDatabase database = new ShardingSphereDatabase("foo_db", databaseType, mock(ResourceMetaData.class), ruleMetaData, schemas);
+        assertFalse(database.containsSchema("new_schema"));
+        
+        database.addSchema("new_schema", schema);
+        assertTrue(database.containsSchema("new_schema"));
+        assertThat(database.getSchema("new_schema"), is(schema));
+    }
+    
+    @Test
+    void assertDropSchema() {
+        DatabaseType databaseType = mock(DatabaseType.class);
+        RuleMetaData ruleMetaData = mock(RuleMetaData.class);
+        Map<String, ShardingSphereSchema> schemas = new HashMap<>();
+        ShardingSphereSchema schema = mock(ShardingSphereSchema.class);
+        schemas.put("schema1", schema);
+        ShardingSphereDatabase database = new ShardingSphereDatabase("foo_db", databaseType, mock(ResourceMetaData.class), ruleMetaData, schemas);
+        assertTrue(database.containsSchema("schema1"));
+        database.dropSchema("schema1");
+        assertFalse(database.containsSchema("schema1"));
+    }
+    
+    @Test
     void assertIsComplete() {
-        ResourceMetaData resourceMetaData = new ResourceMetaData("sharding_db", Collections.singletonMap("ds", new MockedDataSource()));
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.singletonMap("ds", new MockedDataSource()));
         RuleMetaData ruleMetaData = new RuleMetaData(Collections.singleton(mock(ShardingSphereRule.class)));
         assertTrue(new ShardingSphereDatabase("foo_db", mock(DatabaseType.class), resourceMetaData, ruleMetaData, Collections.emptyMap()).isComplete());
     }
     
     @Test
     void assertIsNotCompleteWithoutRule() {
-        ResourceMetaData resourceMetaData = new ResourceMetaData("sharding_db", Collections.singletonMap("ds", new MockedDataSource()));
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.singletonMap("ds", new MockedDataSource()));
         RuleMetaData ruleMetaData = new RuleMetaData(Collections.emptyList());
         assertFalse(new ShardingSphereDatabase("foo_db", mock(DatabaseType.class), resourceMetaData, ruleMetaData, Collections.emptyMap()).isComplete());
     }
     
     @Test
     void assertIsNotCompleteWithoutDataSource() {
-        ResourceMetaData resourceMetaData = new ResourceMetaData("sharding_db", Collections.emptyMap());
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.emptyMap());
         RuleMetaData ruleMetaData = new RuleMetaData(Collections.singleton(mock(ShardingSphereRule.class)));
         assertFalse(new ShardingSphereDatabase("foo_db", mock(DatabaseType.class), resourceMetaData, ruleMetaData, Collections.emptyMap()).isComplete());
     }
     
     @Test
+    void assertNotContainsDataSource() {
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.emptyMap());
+        RuleMetaData ruleMetaData = new RuleMetaData(Collections.singleton(mock(ShardingSphereRule.class)));
+        assertFalse(new ShardingSphereDatabase("foo_db", mock(DatabaseType.class), resourceMetaData, ruleMetaData, Collections.emptyMap()).containsDataSource());
+    }
+    
+    @Test
+    void assertContainsDataSource() {
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.singletonMap("ds", new MockedDataSource()));
+        RuleMetaData ruleMetaData = new RuleMetaData(Collections.singleton(mock(ShardingSphereRule.class)));
+        assertTrue(new ShardingSphereDatabase("foo_db", mock(DatabaseType.class), resourceMetaData, ruleMetaData, Collections.emptyMap()).containsDataSource());
+    }
+    
+    @Test
     void assertReloadRules() {
-        ResourceMetaData resourceMetaData = new ResourceMetaData("sharding_db", Collections.singletonMap("ds", new MockedDataSource()));
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.singletonMap("ds", new MockedDataSource()));
         Collection<ShardingSphereRule> rules = new LinkedList<>();
         rules.add(mock(MutableDataNodeRule.class, RETURNS_DEEP_STUBS));
-        rules.add(mock(DataSourceContainedRule.class, RETURNS_DEEP_STUBS));
-        rules.add(mock(TableContainedRule.class, RETURNS_DEEP_STUBS));
+        rules.add(mock(ShardingSphereRule.class, RETURNS_DEEP_STUBS));
         RuleMetaData ruleMetaData = new RuleMetaData(rules);
         ShardingSphereDatabase database = new ShardingSphereDatabase("foo_db", mock(DatabaseType.class), resourceMetaData, ruleMetaData, Collections.emptyMap());
         database.reloadRules(MutableDataNodeRule.class);
-        assertThat(database.getRuleMetaData().getRules().size(), is(3));
+        assertThat(database.getRuleMetaData().getRules().size(), is(2));
     }
     
     @Test

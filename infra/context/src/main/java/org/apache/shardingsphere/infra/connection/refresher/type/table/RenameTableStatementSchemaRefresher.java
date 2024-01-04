@@ -60,11 +60,11 @@ public final class RenameTableStatementSchemaRefresher implements MetaDataRefres
     private ShardingSphereTable getTable(final ShardingSphereDatabase database, final Collection<String> logicDataSourceNames, final String schemaName, final String tableName,
                                          final ConfigurationProperties props) throws SQLException {
         RuleMetaData ruleMetaData = new RuleMetaData(new LinkedList<>(database.getRuleMetaData().getRules()));
-        if (TableRefreshUtils.isSingleTable(tableName, database)) {
+        if (TableRefreshUtils.isSingleTable(tableName, database) && !logicDataSourceNames.isEmpty()) {
             ruleMetaData.findRules(MutableDataNodeRule.class).forEach(each -> each.put(logicDataSourceNames.iterator().next(), schemaName, tableName));
         }
         GenericSchemaBuilderMaterial material = new GenericSchemaBuilderMaterial(
-                database.getProtocolType(), database.getResourceMetaData().getStorageUnitMetaData(), ruleMetaData.getRules(), props, schemaName);
+                database.getProtocolType(), database.getResourceMetaData().getStorageUnits(), ruleMetaData.getRules(), props, schemaName);
         Map<String, ShardingSphereSchema> schemaMap = GenericSchemaBuilder.build(Collections.singletonList(tableName), material);
         return Optional.ofNullable(schemaMap.get(schemaName)).map(optional -> optional.getTable(tableName))
                 .orElseGet(() -> new ShardingSphereTable(tableName, Collections.emptyList(), Collections.emptyList(), Collections.emptyList()));

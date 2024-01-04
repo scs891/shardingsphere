@@ -32,6 +32,7 @@ import org.apache.shardingsphere.infra.binder.context.statement.dml.InsertStatem
 import org.apache.shardingsphere.infra.binder.context.statement.dml.SelectStatementContext;
 import org.apache.shardingsphere.infra.binder.context.statement.dml.UpdateStatementContext;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
+import org.apache.shardingsphere.infra.exception.mysql.exception.TooManyPlaceholdersException;
 import org.apache.shardingsphere.infra.exception.mysql.exception.UnsupportedPreparedStatementException;
 import org.apache.shardingsphere.infra.hint.HintValueContext;
 import org.apache.shardingsphere.infra.metadata.database.ShardingSphereDatabase;
@@ -166,6 +167,28 @@ class MySQLComStmtPrepareExecutorTest {
     }
     
     @Test
+    void assertPrepareInsertStatementWithTooManyPlaceholders() {
+        String sql = createTooManyPlaceholdersSQL();
+        when(packet.getSQL()).thenReturn(sql);
+        when(packet.getHintValueContext()).thenReturn(new HintValueContext());
+        int connectionId = 2;
+        when(connectionSession.getConnectionId()).thenReturn(connectionId);
+        when(connectionSession.getDefaultDatabaseName()).thenReturn("foo_db");
+        MySQLStatementIdGenerator.getInstance().registerConnection(connectionId);
+        ContextManager contextManager = mockContextManager();
+        when(ProxyContext.getInstance().getContextManager()).thenReturn(contextManager);
+        assertThrows(TooManyPlaceholdersException.class, () -> new MySQLComStmtPrepareExecutor(packet, connectionSession).execute());
+    }
+    
+    private String createTooManyPlaceholdersSQL() {
+        StringBuilder builder = new StringBuilder("INSERT INTO USER (ID, NAME, AGE) VALUES (?, ?, ?)");
+        for (int index = 0; index < Short.MAX_VALUE; index++) {
+            builder.append(", (?, ?, ?)");
+        }
+        return builder.toString();
+    }
+    
+    @Test
     void assertPrepareUpdateStatement() {
         String sql = "update user set name = ?, age = ? where id = ?";
         when(packet.getSQL()).thenReturn(sql);
@@ -202,7 +225,7 @@ class MySQLComStmtPrepareExecutorTest {
         when(result.getMetaDataContexts().getMetaData().getGlobalRuleMetaData()).thenReturn(mock(RuleMetaData.class));
         CacheOption cacheOption = new CacheOption(1024, 1024);
         when(result.getMetaDataContexts().getMetaData().getGlobalRuleMetaData().getSingleRule(SQLParserRule.class))
-                .thenReturn(new SQLParserRule(new SQLParserRuleConfiguration(false, cacheOption, cacheOption)));
+                .thenReturn(new SQLParserRule(new SQLParserRuleConfiguration(cacheOption, cacheOption)));
         when(result.getMetaDataContexts().getMetaData().getDatabase(connectionSession.getDatabaseName()).getProtocolType()).thenReturn(TypedSPILoader.getService(DatabaseType.class, "MySQL"));
         ShardingSphereTable table = new ShardingSphereTable("user", Arrays.asList(new ShardingSphereColumn("id", Types.BIGINT, true, false, false, false, true, false),
                 new ShardingSphereColumn("name", Types.VARCHAR, false, false, false, false, false, false),
@@ -210,7 +233,7 @@ class MySQLComStmtPrepareExecutorTest {
         ShardingSphereSchema schema = new ShardingSphereSchema();
         schema.getTables().put("user", table);
         ShardingSphereDatabase database = new ShardingSphereDatabase("foo_db", TypedSPILoader.getService(DatabaseType.class, "MySQL"),
-                new ResourceMetaData("foo_db", Collections.emptyMap()), new RuleMetaData(Collections.emptyList()), Collections.singletonMap("foo_db", schema));
+                new ResourceMetaData(Collections.emptyMap()), new RuleMetaData(Collections.emptyList()), Collections.singletonMap("foo_db", schema));
         when(result.getMetaDataContexts().getMetaData().getDatabase("foo_db")).thenReturn(database);
         when(result.getMetaDataContexts().getMetaData().containsDatabase("foo_db")).thenReturn(true);
         return result;

@@ -111,21 +111,21 @@ class DatabaseConnectorTest {
         when(databaseConnectionManager.getConnectionSession().getDatabaseName()).thenReturn("foo_db");
         ContextManager contextManager = mockContextManager();
         when(ProxyContext.getInstance().getContextManager()).thenReturn(contextManager);
-        ShardingSphereDatabase database = contextManager.getMetaDataContexts().getMetaData().getDatabase("foo_db");
-        when(ProxyContext.getInstance().getDatabase("foo_db")).thenReturn(database);
     }
     
     private ContextManager mockContextManager() {
         RuleMetaData globalRuleMetaData =
-                new RuleMetaData(Arrays.asList(new SQLParserRule(new SQLParserRuleConfiguration(false, mock(CacheOption.class), mock(CacheOption.class))), sqlFederationRule));
+                new RuleMetaData(Arrays.asList(new SQLParserRule(new SQLParserRuleConfiguration(mock(CacheOption.class), mock(CacheOption.class))), sqlFederationRule));
         MetaDataPersistService metaDataPersistService = mock(MetaDataPersistService.class);
         ShardingSphereDataPersistService shardingSphereDataPersistService = mock(ShardingSphereDataPersistService.class);
         when(shardingSphereDataPersistService.load(any())).thenReturn(Optional.empty());
         when(metaDataPersistService.getShardingSphereDataPersistService()).thenReturn(shardingSphereDataPersistService);
+        Map<String, ShardingSphereDatabase> databases = mockDatabases();
         MetaDataContexts metaDataContexts = new MetaDataContexts(metaDataPersistService,
-                new ShardingSphereMetaData(mockDatabases(), mock(ResourceMetaData.class), globalRuleMetaData, new ConfigurationProperties(new Properties())));
+                new ShardingSphereMetaData(databases, mock(ResourceMetaData.class), globalRuleMetaData, new ConfigurationProperties(new Properties())));
         ContextManager result = mock(ContextManager.class, RETURNS_DEEP_STUBS);
         when(result.getMetaDataContexts()).thenReturn(metaDataContexts);
+        when(result.getDatabase("foo_db")).thenReturn(databases.get("foo_db"));
         return result;
     }
     

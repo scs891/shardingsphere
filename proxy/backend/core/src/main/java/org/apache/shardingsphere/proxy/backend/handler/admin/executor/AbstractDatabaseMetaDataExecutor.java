@@ -20,7 +20,6 @@ package org.apache.shardingsphere.proxy.backend.handler.admin.executor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.shardingsphere.authority.checker.AuthorityChecker;
 import org.apache.shardingsphere.authority.rule.AuthorityRule;
 import org.apache.shardingsphere.infra.executor.sql.execute.result.query.QueryResultMetaData;
@@ -127,7 +126,7 @@ public abstract class AbstractDatabaseMetaDataExecutor implements DatabaseAdminQ
     }
     
     protected static Boolean hasDataSource(final String databaseName) {
-        return ProxyContext.getInstance().getDatabase(databaseName).containsDataSource();
+        return ProxyContext.getInstance().getContextManager().getDatabase(databaseName).containsDataSource();
     }
     
     protected static boolean isAuthorized(final String databaseName, final Grantee grantee) {
@@ -139,7 +138,6 @@ public abstract class AbstractDatabaseMetaDataExecutor implements DatabaseAdminQ
      * Default database meta data executor, execute sql directly in the database to obtain the result source data.
      */
     @RequiredArgsConstructor
-    @Slf4j
     public static class DefaultDatabaseMetaDataExecutor extends AbstractDatabaseMetaDataExecutor {
         
         private final String sql;
@@ -160,7 +158,7 @@ public abstract class AbstractDatabaseMetaDataExecutor implements DatabaseAdminQ
         @Override
         protected void processMetaData(final String databaseName, final Consumer<ResultSet> callback) throws SQLException {
             ResourceMetaData resourceMetaData = ProxyContext.getInstance().getContextManager().getMetaDataContexts().getMetaData().getDatabase(databaseName).getResourceMetaData();
-            Optional<StorageUnit> storageUnit = resourceMetaData.getStorageUnitMetaData().getStorageUnits().values().stream().findFirst();
+            Optional<StorageUnit> storageUnit = resourceMetaData.getStorageUnits().values().stream().findFirst();
             if (!storageUnit.isPresent()) {
                 return;
             }

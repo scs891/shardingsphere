@@ -40,10 +40,13 @@ import java.sql.Statement;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -65,8 +68,8 @@ class JDBCExecutorCallbackTest {
     @Test
     void assertExecuteFailedAndProtocolTypeDifferentWithDatabaseType() throws SQLException {
         Object saneResult = new Object();
-        ResourceMetaData resourceMetaData = mock(ResourceMetaData.class);
-        when(resourceMetaData.getStorageType("ds")).thenReturn(TypedSPILoader.getService(DatabaseType.class, "PostgreSQL"));
+        ResourceMetaData resourceMetaData = mock(ResourceMetaData.class, RETURNS_DEEP_STUBS);
+        when(resourceMetaData.getStorageUnits().get("ds").getStorageType()).thenReturn(TypedSPILoader.getService(DatabaseType.class, "PostgreSQL"));
         JDBCExecutorCallback<Object> callback =
                 new JDBCExecutorCallback<Object>(TypedSPILoader.getService(DatabaseType.class, "MySQL"), resourceMetaData, mock(SelectStatement.class), true) {
                     
@@ -80,14 +83,15 @@ class JDBCExecutorCallbackTest {
                         return Optional.of(saneResult);
                     }
                 };
-        assertThat(callback.execute(units, true), is(Collections.singletonList(saneResult)));
-        assertThat(callback.execute(units, false), is(Collections.emptyList()));
+        String processId = new UUID(ThreadLocalRandom.current().nextLong(), ThreadLocalRandom.current().nextLong()).toString().replace("-", "");
+        assertThat(callback.execute(units, true, processId), is(Collections.singletonList(saneResult)));
+        assertThat(callback.execute(units, false, processId), is(Collections.emptyList()));
     }
     
     @Test
     void assertExecuteSQLExceptionOccurredAndProtocolTypeSameAsDatabaseType() {
-        ResourceMetaData resourceMetaData = mock(ResourceMetaData.class);
-        when(resourceMetaData.getStorageType("ds")).thenReturn(TypedSPILoader.getService(DatabaseType.class, "PostgreSQL"));
+        ResourceMetaData resourceMetaData = mock(ResourceMetaData.class, RETURNS_DEEP_STUBS);
+        when(resourceMetaData.getStorageUnits().get("ds").getStorageType()).thenReturn(TypedSPILoader.getService(DatabaseType.class, "PostgreSQL"));
         JDBCExecutorCallback<Object> callback =
                 new JDBCExecutorCallback<Object>(TypedSPILoader.getService(DatabaseType.class, "MySQL"), resourceMetaData, mock(SelectStatement.class), true) {
                     
@@ -101,6 +105,7 @@ class JDBCExecutorCallbackTest {
                         return Optional.empty();
                     }
                 };
-        assertThrows(SQLException.class, () -> callback.execute(units, true));
+        String processId = new UUID(ThreadLocalRandom.current().nextLong(), ThreadLocalRandom.current().nextLong()).toString().replace("-", "");
+        assertThrows(SQLException.class, () -> callback.execute(units, true, processId));
     }
 }

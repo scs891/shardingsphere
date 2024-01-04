@@ -32,10 +32,15 @@ literals
     | booleanLiterals
     | nullValueLiterals
     | intervalLiterals
+    | bindLiterals
     ;
 
 intervalLiterals
     : INTERVAL stringLiterals intervalUnit (intervalPrecision)? (TO intervalUnit (intervalPrecision)?)?
+    ;
+
+bindLiterals
+    : COLON_ identifier
     ;
 
 intervalPrecision
@@ -48,6 +53,8 @@ intervalUnit
 
 stringLiterals
     : STRING_
+    | NCHAR_TEXT
+    | UCHAR_TEXT
     ;
 
 numberLiterals
@@ -85,8 +92,7 @@ unreservedWord
 
 unreservedWord1
     : TRUNCATE | FUNCTION | PROCEDURE | CASE | WHEN | CAST | TRIM | SUBSTRING
-    | NATURAL | JOIN | FULL | INNER | OUTER | LEFT | RIGHT
-    | CROSS | USING | IF | TRUE | FALSE | LIMIT | OFFSET
+    | USING | IF | TRUE | FALSE | LIMIT | OFFSET
     | COMMIT | ROLLBACK | SAVEPOINT
     | ARRAY | INTERVAL | TIME | TIMESTAMP | LOCALTIME | LOCALTIMESTAMP | YEAR
     | QUARTER | MONTH | WEEK | DAY | HOUR | MINUTE | SECOND
@@ -116,7 +122,7 @@ unreservedWord1
     | COLLATION | REAL | TYPE | FIRST | RANK | SAMPLE | SYSTIMESTAMP | MINUTE | ANY 
     | LENGTH | SINGLE_C | TIME_UNIT | TARGET | PUBLIC | ID | STATE | PRIORITY
     | PRIMARY | FOREIGN | KEY | POSITION | PRECISION | FUNCTION | PROCEDURE | SPECIFICATION | CASE
-    | WHEN | CAST | TRIM | SUBSTRING | FULL | INNER | OUTER | LEFT | RIGHT | CROSS
+    | WHEN | CAST | TRIM | SUBSTRING | JOIN
     | USING | FALSE | SAVEPOINT | BODY | CHARACTER | ARRAY | TIME | TIMEOUT | TIMESTAMP | LOCALTIME
     | DAY | ENABLE | DISABLE | CALL | INSTANCE | CLOSE | NEXT | NAME | NUMERIC
     | TRIGGERS | GLOBAL_NAME | BINARY | MOD | XOR | UNKNOWN | ALWAYS | CASCADE | GENERATED | PRIVILEGES
@@ -180,7 +186,7 @@ unreservedWord1
     | HOST | PORT | EVERY | MINUTES | HOURS | NORELOCATE | SAVE | DISCARD | APPLICATION | INSTALL
     | MINIMUM | VERSION | UNINSTALL | COMPATIBILITY | MATERIALIZE | SUBTYPE | RECORD | CONSTANT | CURSOR
     | OTHERS | EXCEPTION | CPU_PER_SESSION | CONNECT_TIME | LOGICAL_READS_PER_SESSION | PRIVATE_SGA | PERCENT_RANK | ROWID
-    | LPAD | ZONE | SESSIONTIMEZONE | TO_CHAR | XMLELEMENT | COLUMN_VALUE | EVALNAME | LEVEL | CONTENT | ON
+    | LPAD | ZONE | SESSIONTIMEZONE | TO_CHAR | XMLELEMENT | COLUMN_VALUE | EVALNAME | LEVEL | CONTENT | ON | LOOP | EXIT | ELSIF
     ;
     
 unreservedWord2
@@ -328,7 +334,7 @@ unreservedWord3
     | WIDTH_BUCKET | WRAPPED | XID | XMLAGG | XMLATTRIBUTES | XMLCAST | XMLCDATA | XMLCOLATTVAL | XMLCOMMENT | XMLCONCAT | XMLDIFF
     | XMLEXISTS | XMLEXISTS2 | XMLFOREST | XMLINDEX_REWRITE | XMLINDEX_REWRITE_IN_SELECT | XMLINDEX_SEL_IDX_TBL | XMLISNODE
     | XMLISVALID | XMLNAMESPACES | XMLPARSE | XMLPATCH | XMLPI | XMLQUERY | XMLROOT | XMLSERIALIZE | XMLTABLE | XMLTOOBJECT
-    | XMLTRANSFORM | XMLTRANSFORMBLOB | XML_DML_RWT_STMT | XPATHTABLE | XS_SYS_CONTEXT | X_DYN_PRUNE | RESULT | TABLE | NUMBER | CHAR
+    | XMLTRANSFORM | XMLTRANSFORMBLOB | XML_DML_RWT_STMT | XPATHTABLE | XS_SYS_CONTEXT | X_DYN_PRUNE | RESULT | TABLE | NUMBER | CHAR | SQLCODE
     ;
 
 schemaName
@@ -439,6 +445,10 @@ tablespaceName
     : identifier
     ;
 
+newTablespaceName
+    : identifier
+    ;
+
 subprogramName
     : identifier
     ;
@@ -468,6 +478,10 @@ connectionQualifier
     ;
 
 functionName
+    : identifier
+    ;
+
+cursorName
     : identifier
     ;
 
@@ -592,7 +606,7 @@ username
     ;
 
 password
-    : identifier
+    : identifier | STRING_
     ;
 
 logGroupName
@@ -775,7 +789,11 @@ leadLagInfo
 
 specialFunction
     : castFunction | charFunction | extractFunction | formatFunction | firstOrLastValueFunction | trimFunction | featureFunction
-    | setFunction | translateFunction | cursorFunction | toDateFunction | approxRank
+    | setFunction | translateFunction | cursorFunction | toDateFunction | approxRank | wmConcatFunction
+    ;
+
+wmConcatFunction
+    : WM_CONCAT LP_ expr RP_ overClause?
     ;
 
 approxRank
@@ -900,6 +918,10 @@ orderByItem
     : (columnName | numberLiterals | expr) (ASC | DESC)? (NULLS FIRST | NULLS LAST)?
     ;
 
+attribute
+    : (owner DOT_)? identifier
+    ;
+
 attributeName
     : oracleId
     ;
@@ -1006,10 +1028,6 @@ ignoredIdentifiers
 
 matchNone
     : 'Default does not match anything'
-    ;
-
-hashSubpartitionQuantity
-    : NUMBER
     ;
 
 odciParameters
@@ -1350,6 +1368,7 @@ namespace
 
 restorePoint
     : identifier
+    | stringLiterals
     ;
 
 scnValue
@@ -1723,6 +1742,10 @@ filenamePattern
     : STRING_
     ;
 
+replacementFilenamePattern
+    : STRING_
+    ;
+
 connectString
     : STRING_
     ;
@@ -2026,18 +2049,18 @@ xmlSerializeFunction
     ;
 
 xmlTableFunction
-    : XMLTABLE LP_ (xmlNameSpacesClause COMMA_)? STRING_ xmlTableOptions RP_
+    : XMLTABLE LP_ (xmlNamespacesClause COMMA_)? STRING_ xmlTableOptions RP_
     ;
 
 xmlIsSchemaValidFunction
     : (owner DOT_)* name DOT_ ISSCHEMAVALID LP_ expr (COMMA_ expr)* RP_ 
     ;
 
-xmlNameSpacesClause
-    : XMLNAMESPACES LP_ (defaultString COMMA_)? (xmlNameSpaceStringAsIdentifier | defaultString) (COMMA_ (xmlNameSpaceStringAsIdentifier | defaultString))* RP_
+xmlNamespacesClause
+    : XMLNAMESPACES LP_ (defaultString COMMA_)? (xmlNamespaceStringAsIdentifier | defaultString) (COMMA_ (xmlNamespaceStringAsIdentifier | defaultString))* RP_
     ;
 
-xmlNameSpaceStringAsIdentifier
+xmlNamespaceStringAsIdentifier
     : STRING_ AS identifier
     ;
 
@@ -2065,4 +2088,75 @@ multisetOperator
 
 superview
     : identifier
+    ;
+
+primaryName
+    : identifier
+    ;
+
+directoryObjectName
+    : identifier
+    ;
+
+serverFileName
+    : identifier
+    ;
+
+keyForBlob
+    : identifier
+    ;
+
+sourceText
+    : identifier
+    ;
+
+fullPathName
+    : STRING_
+    ;
+
+directoryObject
+    : identifier
+    ;
+
+credentialName
+    : identifier
+    ;
+
+agentDblink
+    : STRING_
+    ;
+
+xPathsList
+    : STRING_
+    ;
+
+sizeClause
+    : INTEGER_ capacityUnit?
+    ;
+
+maxsizeClause
+    : MAXSIZE (UNLIMITED | sizeClause)
+    ;
+
+editionType
+    : VIEW | SYNONYM | PROCEDURE | FUNCTION | PACKAGE | PACKAGE BODY | TRIGGER | TYPE | TYPE BODY | LIBRARY
+    ;
+
+containerDataClause
+    : (SET CONTAINER_DATA EQ_ (ALL | DEFAULT | containerName (COMMA_ containerName)*)
+    | (ADD | REMOVE) CONTAINER_DATA containerName (COMMA_ containerName)*)
+    (FOR (schemaName DOT_)? name)?
+    ;
+
+proxyClause
+    : GRANT CONNECT THROUGH (ENTERPRISE USERS | dbUserProxy dbUserProxyClauses)
+    | REVOKE CONNECT THROUGH (ENTERPRISE USERS | username)
+    ;
+
+dbUserProxy
+    : identifier
+    ;
+
+dbUserProxyClauses
+    : (WITH ((ROLE (ALL EXCEPT)? roleName (COMMA_ roleName)*) | NO ROLES))? (AUTHENTICATION REQUIRED | AUTHENTICATED USING PASSWORD)?
     ;

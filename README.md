@@ -26,7 +26,7 @@
 
 <hr>
 
-Apache ShardingSphere is a distributed SQL transaction & query engine for data sharding, scaling, encryption, and more - on any database. Our community's guiding development concept is Database Plus for creating a complete ecosystem that allows you to transform any database into a distributed database system. 
+Apache ShardingSphere is a distributed SQL transaction & query engine that allows for data sharding, scaling, encryption, and more - on any database. Our community's guiding development concept is Database Plus for creating a complete ecosystem that allows you to transform any database into a distributed database system. 
 
 It focuses on repurposing existing databases, by placing a standardized upper layer above existing and fragmented databases, rather than creating a new database. 
 
@@ -57,13 +57,6 @@ For full documentation & more details, visit: [Docs](https://shardingsphere.apac
 <hr>
 
 For guides on how to get started and setup your environment, contributor & committer guides, visit: [Contribution Guidelines](https://shardingsphere.apache.org/community/en/involved/)
-
-Good news! We'll be taking part in [Hacktoberfest 2022](https://hacktoberfest.com) 🍻🎉 Hacktoberfest is for everyone. 
-
-Whether it's your first time, you're a seasoned PRO - it's almost time to get hacking, chase those pull/merge requests and complete your mission in supporting open source.
-
-You can find the issues we've prepared for this year's Hacktoberfest [here](https://github.com/apache/shardingsphere/issues?q=is%3Aopen+is%3Aissue+label%3Ahacktoberfest).
-
 
 ### Team
 
@@ -133,7 +126,7 @@ Keep an eye on the [milestones page](https://github.com/apache/shardingsphere/mi
 <hr>
 
 Apache ShardingSphere includes 2 independent products: JDBC & Proxy.
-They all provide functions of data scale-out, distributed transaction and distributed governance, applicable in a variety of situations such as Java isomorphism, heterogeneous language and Cloud-Native.
+They all provide functions of data scale-out, distributed transaction and distributed governance, applicable in a variety of situations such as Java-based isomorphism, heterogeneous language and Cloud-Native.
 
 ### ShardingSphere-JDBC
 
@@ -154,7 +147,7 @@ With the client end connecting directly to the database, it provides services in
 [![Download](https://img.shields.io/badge/release-download-orange.svg)](https://www.apache.org/dyn/closer.lua/shardingsphere/5.3.2/apache-shardingsphere-5.3.2-shardingsphere-proxy-bin.tar.gz)
 [![Docker Pulls](https://img.shields.io/docker/pulls/apache/shardingsphere-proxy.svg)](https://store.docker.com/community/images/apache/shardingsphere-proxy)
 
-A transparent database proxy, providing a database server that encapsulates database binary protocol to support heterogeneous languages. 
+A transparent database proxy, providing a database server that encapsulates the database binary protocol to support heterogeneous languages. 
 Friendlier to DBAs, the MySQL and PostgreSQL version now provided can use any kind of terminal.
 
 :link: For more details, follow this [link to the official website](https://shardingsphere.apache.org/document/current/en/overview/#shardingsphere-proxy).
@@ -164,9 +157,9 @@ Friendlier to DBAs, the MySQL and PostgreSQL version now provided can use any ki
 <hr>
 
 ShardingSphere-JDBC adopts a decentralized architecture, applicable to high-performance light-weight OLTP applications developed with Java. 
-ShardingSphere-Proxy provides static entry and all languages support, suitable for OLAP application and sharding databases management and operation.
+ShardingSphere-Proxy provides static entry and all languages support, suitable for an OLAP application and sharding databases management and operation.
 
-Through the mixed use of ShardingSphere-JDBC & ShardingSphere-Proxy together with a unified sharding strategy by the same registry center, the ShardingSphere ecosystem can build an application system suitable to all kinds of scenarios.
+Through the combination of ShardingSphere-JDBC & ShardingSphere-Proxy together with a unified sharding strategy by the same registry center, the ShardingSphere ecosystem can build an application system suitable to all kinds of scenarios.
 
 :link: More details can be found following this [link to the official website](https://shardingsphere.apache.org/document/current/en/overview/#hybrid-architecture).
 

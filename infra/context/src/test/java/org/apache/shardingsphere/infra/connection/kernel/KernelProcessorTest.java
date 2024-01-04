@@ -31,6 +31,7 @@ import org.apache.shardingsphere.infra.rule.ShardingSphereRule;
 import org.apache.shardingsphere.infra.session.connection.ConnectionContext;
 import org.apache.shardingsphere.infra.session.query.QueryContext;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.SelectStatement;
+import org.apache.shardingsphere.sqltranslator.context.SQLTranslatorContext;
 import org.apache.shardingsphere.sqltranslator.rule.SQLTranslatorRule;
 import org.apache.shardingsphere.test.util.PropertiesBuilder;
 import org.apache.shardingsphere.test.util.PropertiesBuilder.Property;
@@ -42,6 +43,7 @@ import java.util.LinkedList;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -53,8 +55,10 @@ class KernelProcessorTest {
         SQLStatementContext sqlStatementContext = mock(CommonSQLStatementContext.class);
         when(sqlStatementContext.getSqlStatement()).thenReturn(mock(SelectStatement.class));
         QueryContext queryContext = new QueryContext(sqlStatementContext, "SELECT * FROM tbl", Collections.emptyList());
+        ResourceMetaData resourceMetaData = mock(ResourceMetaData.class, RETURNS_DEEP_STUBS);
+        when(resourceMetaData.getStorageUnits()).thenReturn(Collections.emptyMap());
         ShardingSphereDatabase database = new ShardingSphereDatabase(DefaultDatabase.LOGIC_NAME, mock(DatabaseType.class),
-                mock(ResourceMetaData.class, RETURNS_DEEP_STUBS), new RuleMetaData(mockShardingSphereRule()), Collections.emptyMap());
+                resourceMetaData, new RuleMetaData(mockShardingSphereRule()), Collections.emptyMap());
         ConfigurationProperties props = new ConfigurationProperties(PropertiesBuilder.build(new Property(ConfigurationPropertyKey.SQL_SHOW.getKey(), Boolean.TRUE.toString())));
         ExecutionContext actual = new KernelProcessor().generateExecutionContext(queryContext, database, new RuleMetaData(mockShardingSphereRule()), props,
                 mock(ConnectionContext.class));
@@ -63,7 +67,9 @@ class KernelProcessorTest {
     
     private Collection<ShardingSphereRule> mockShardingSphereRule() {
         Collection<ShardingSphereRule> result = new LinkedList<>();
-        result.add(mock(SQLTranslatorRule.class));
+        SQLTranslatorRule sqlTranslatorRule = mock(SQLTranslatorRule.class);
+        when(sqlTranslatorRule.translate(any(), any(), any(), any(), any(), any())).thenReturn(new SQLTranslatorContext("", Collections.emptyList()));
+        result.add(sqlTranslatorRule);
         return result;
     }
 }

@@ -21,22 +21,19 @@ import lombok.Getter;
 import org.apache.shardingsphere.infra.binder.context.statement.SQLStatementContext;
 import org.apache.shardingsphere.infra.binder.context.type.IndexAvailable;
 import org.apache.shardingsphere.infra.config.rule.RuleConfiguration;
-import org.apache.shardingsphere.infra.database.DatabaseTypeEngine;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseTypeRegistry;
 import org.apache.shardingsphere.infra.datanode.DataNode;
-import org.apache.shardingsphere.infra.state.datasource.DataSourceStateManager;
 import org.apache.shardingsphere.infra.metadata.database.ShardingSphereDatabase;
 import org.apache.shardingsphere.infra.metadata.database.schema.QualifiedTable;
 import org.apache.shardingsphere.infra.metadata.database.schema.util.IndexMetaDataUtils;
 import org.apache.shardingsphere.infra.rule.ShardingSphereRule;
 import org.apache.shardingsphere.infra.rule.identifier.scope.DatabaseRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.DataNodeContainedRule;
 import org.apache.shardingsphere.infra.rule.identifier.type.MutableDataNodeRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.TableContainedRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.TableNamesMapper;
+import org.apache.shardingsphere.infra.rule.identifier.type.RuleIdentifiers;
 import org.apache.shardingsphere.infra.rule.identifier.type.exportable.ExportableRule;
 import org.apache.shardingsphere.infra.rule.identifier.type.exportable.constant.ExportableConstants;
+import org.apache.shardingsphere.infra.state.datasource.DataSourceStateManager;
 import org.apache.shardingsphere.single.api.config.SingleRuleConfiguration;
 import org.apache.shardingsphere.single.datanode.SingleTableDataNodeLoader;
 import org.apache.shardingsphere.single.util.SingleTableLoadUtils;
@@ -56,7 +53,7 @@ import java.util.concurrent.ThreadLocalRandom;
 /**
  * Single rule.
  */
-public final class SingleRule implements DatabaseRule, DataNodeContainedRule, TableContainedRule, MutableDataNodeRule, ExportableRule {
+public final class SingleRule implements DatabaseRule, MutableDataNodeRule, ExportableRule {
     
     @Getter
     private final SingleRuleConfiguration configuration;
@@ -66,22 +63,26 @@ public final class SingleRule implements DatabaseRule, DataNodeContainedRule, Ta
     @Getter
     private final Collection<String> dataSourceNames;
     
-    @Getter
     private final Map<String, Collection<DataNode>> singleTableDataNodes;
     
-    private final TableNamesMapper tableNamesMapper = new TableNamesMapper();
+    private final DatabaseType protocolType;
     
-    private final DatabaseType databaseType;
+    private final SingleTableMapperRule tableMapperRule;
     
-    public SingleRule(final SingleRuleConfiguration ruleConfig, final String databaseName, final Map<String, DataSource> dataSourceMap, final Collection<ShardingSphereRule> builtRules) {
+    @Getter
+    private final RuleIdentifiers ruleIdentifiers;
+    
+    public SingleRule(final SingleRuleConfiguration ruleConfig, final String databaseName,
+                      final DatabaseType protocolType, final Map<String, DataSource> dataSourceMap, final Collection<ShardingSphereRule> builtRules) {
         configuration = ruleConfig;
         defaultDataSource = ruleConfig.getDefaultDataSource().orElse(null);
         Map<String, DataSource> enabledDataSources = DataSourceStateManager.getInstance().getEnabledDataSources(databaseName, dataSourceMap);
         Map<String, DataSource> aggregateDataSourceMap = SingleTableLoadUtils.getAggregatedDataSourceMap(enabledDataSources, builtRules);
         dataSourceNames = aggregateDataSourceMap.keySet();
-        databaseType = DatabaseTypeEngine.getStorageType(enabledDataSources.values());
-        singleTableDataNodes = SingleTableDataNodeLoader.load(databaseName, databaseType, aggregateDataSourceMap, builtRules, configuration.getTables());
-        singleTableDataNodes.forEach((key, value) -> tableNamesMapper.put(value.iterator().next().getTableName()));
+        this.protocolType = protocolType;
+        singleTableDataNodes = SingleTableDataNodeLoader.load(databaseName, protocolType, aggregateDataSourceMap, builtRules, configuration.getTables());
+        tableMapperRule = new SingleTableMapperRule(singleTableDataNodes.values());
+        ruleIdentifiers = new RuleIdentifiers(new SingleDataNodeRule(singleTableDataNodes), tableMapperRule);
     }
     
     /**
@@ -172,9 +173,9 @@ public final class SingleRule implements DatabaseRule, DataNodeContainedRule, Ta
      * @return qualified tables
      */
     public Collection<QualifiedTable> getQualifiedTables(final SQLStatementContext sqlStatementContext, final ShardingSphereDatabase database) {
-        Collection<QualifiedTable> result = getQualifiedTables(database, databaseType, sqlStatementContext.getTablesContext().getSimpleTableSegments());
+        Collection<QualifiedTable> result = getQualifiedTables(database, protocolType, sqlStatementContext.getTablesContext().getSimpleTableSegments());
         if (result.isEmpty() && sqlStatementContext instanceof IndexAvailable) {
-            result = IndexMetaDataUtils.getTableNames(database, databaseType, ((IndexAvailable) sqlStatementContext).getIndexes());
+            result = IndexMetaDataUtils.getTableNames(database, protocolType, ((IndexAvailable) sqlStatementContext).getIndexes());
         }
         return result;
     }
@@ -196,18 +197,18 @@ public final class SingleRule implements DatabaseRule, DataNodeContainedRule, Ta
             DataNode dataNode = new DataNode(dataSourceName, tableName);
             dataNode.setSchemaName(schemaName);
             dataNodes.add(dataNode);
-            tableNamesMapper.put(tableName);
+            tableMapperRule.getLogicTableMapper().put(tableName);
             addTableConfiguration(dataSourceName, schemaName, tableName);
         }
     }
     
     private void addTableConfiguration(final String dataSourceName, final String schemaName, final String tableName) {
         Collection<String> splitTables = SingleTableLoadUtils.splitTableLines(configuration.getTables());
-        if (splitTables.contains(SingleTableLoadUtils.getAllTablesNodeStr(databaseType))
-                || splitTables.contains(SingleTableLoadUtils.getAllTablesNodeStrFromDataSource(databaseType, dataSourceName, schemaName))) {
+        if (splitTables.contains(SingleTableLoadUtils.getAllTablesNodeStr(protocolType))
+                || splitTables.contains(SingleTableLoadUtils.getAllTablesNodeStrFromDataSource(protocolType, dataSourceName, schemaName))) {
             return;
         }
-        String dataNodeString = SingleTableLoadUtils.getDataNodeString(databaseType, dataSourceName, schemaName, tableName);
+        String dataNodeString = SingleTableLoadUtils.getDataNodeString(protocolType, dataSourceName, schemaName, tableName);
         if (!configuration.getTables().contains(dataNodeString)) {
             configuration.getTables().add(dataNodeString);
         }
@@ -229,12 +230,12 @@ public final class SingleRule implements DatabaseRule, DataNodeContainedRule, Ta
             DataNode each = iterator.next();
             if (schemaNames.contains(each.getSchemaName().toLowerCase())) {
                 iterator.remove();
-                configuration.getTables().remove(SingleTableLoadUtils.getDataNodeString(databaseType, each.getDataSourceName(), each.getSchemaName(), tableName));
+                configuration.getTables().remove(SingleTableLoadUtils.getDataNodeString(protocolType, each.getDataSourceName(), each.getSchemaName(), tableName));
             }
         }
         if (dataNodes.isEmpty()) {
             singleTableDataNodes.remove(tableName.toLowerCase());
-            tableNamesMapper.remove(tableName);
+            tableMapperRule.getLogicTableMapper().remove(tableName);
         }
     }
     
@@ -252,61 +253,11 @@ public final class SingleRule implements DatabaseRule, DataNodeContainedRule, Ta
     @Override
     public ShardingSphereRule reloadRule(final RuleConfiguration config, final String databaseName, final Map<String, DataSource> dataSourceMap,
                                          final Collection<ShardingSphereRule> builtRules) {
-        return new SingleRule((SingleRuleConfiguration) config, databaseName, dataSourceMap, builtRules);
-    }
-    
-    @Override
-    public Map<String, Collection<DataNode>> getAllDataNodes() {
-        return singleTableDataNodes;
-    }
-    
-    @Override
-    public Collection<DataNode> getDataNodesByTableName(final String tableName) {
-        return singleTableDataNodes.getOrDefault(tableName.toLowerCase(), Collections.emptyList());
-    }
-    
-    @Override
-    public Optional<String> findFirstActualTable(final String logicTable) {
-        return Optional.empty();
-    }
-    
-    @Override
-    public boolean isNeedAccumulate(final Collection<String> tables) {
-        return false;
-    }
-    
-    @Override
-    public Optional<String> findLogicTableByActualTable(final String actualTable) {
-        return Optional.empty();
-    }
-    
-    @Override
-    public Optional<String> findActualTableByCatalog(final String catalog, final String logicTable) {
-        return Optional.empty();
-    }
-    
-    @Override
-    public TableNamesMapper getLogicTableMapper() {
-        return tableNamesMapper;
-    }
-    
-    @Override
-    public TableNamesMapper getActualTableMapper() {
-        return new TableNamesMapper();
-    }
-    
-    @Override
-    public TableNamesMapper getDistributedTableMapper() {
-        return new TableNamesMapper();
-    }
-    
-    @Override
-    public TableNamesMapper getEnhancedTableMapper() {
-        return new TableNamesMapper();
+        return new SingleRule((SingleRuleConfiguration) config, databaseName, protocolType, dataSourceMap, builtRules);
     }
     
     @Override
     public Map<String, Object> getExportData() {
-        return Collections.singletonMap(ExportableConstants.EXPORT_SINGLE_TABLES, tableNamesMapper.getTableNames());
+        return Collections.singletonMap(ExportableConstants.EXPORT_SINGLE_TABLES, tableMapperRule.getLogicTableMapper().getTableNames());
     }
 }

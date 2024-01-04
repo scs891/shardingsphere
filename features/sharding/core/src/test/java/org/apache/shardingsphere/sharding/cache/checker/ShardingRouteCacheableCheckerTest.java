@@ -17,9 +17,10 @@
 
 package org.apache.shardingsphere.sharding.cache.checker;
 
+import org.apache.groovy.util.Maps;
 import org.apache.shardingsphere.infra.binder.context.statement.SQLStatementContext;
 import org.apache.shardingsphere.infra.binder.engine.SQLBindEngine;
-import org.apache.shardingsphere.infra.config.algorithm.AlgorithmConfiguration;
+import org.apache.shardingsphere.infra.algorithm.core.config.AlgorithmConfiguration;
 import org.apache.shardingsphere.infra.config.props.ConfigurationProperties;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
 import org.apache.shardingsphere.infra.instance.ComputeNodeInstance;
@@ -44,6 +45,7 @@ import org.apache.shardingsphere.sharding.api.config.strategy.sharding.StandardS
 import org.apache.shardingsphere.sharding.rule.ShardingRule;
 import org.apache.shardingsphere.sql.parser.api.CacheOption;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.SQLStatement;
+import org.apache.shardingsphere.test.fixture.jdbc.MockedDataSource;
 import org.apache.shardingsphere.test.util.PropertiesBuilder;
 import org.apache.shardingsphere.test.util.PropertiesBuilder.Property;
 import org.apache.shardingsphere.timeservice.api.config.TimestampServiceRuleConfiguration;
@@ -102,7 +104,8 @@ class ShardingRouteCacheableCheckerTest {
         nonCacheableTableSharding.setTableShardingStrategy(new StandardShardingStrategyConfiguration("id", "inline"));
         ruleConfig.getTables().add(nonCacheableTableSharding);
         ruleConfig.setShardingCache(new ShardingCacheConfiguration(100, new ShardingCacheOptionsConfiguration(true, 0, 0)));
-        return new ShardingRule(ruleConfig, Arrays.asList("ds_0", "ds_1"), new InstanceContext(mock(ComputeNodeInstance.class), props -> 0, null, null, null, null));
+        return new ShardingRule(ruleConfig, Maps.of("ds_0", new MockedDataSource(), "ds_1", new MockedDataSource()),
+                new InstanceContext(mock(ComputeNodeInstance.class), props -> 0, null, null, null, null));
     }
     
     private TimestampServiceRule createTimeServiceRule() {
@@ -111,8 +114,9 @@ class ShardingRouteCacheableCheckerTest {
     
     private ShardingSphereDatabase createDatabase(final ShardingRule shardingRule, final TimestampServiceRule timestampServiceRule) {
         ShardingSphereSchema schema = new ShardingSphereSchema();
-        schema.getTables().put("t_warehouse", new ShardingSphereTable("t_warehouse",
-                Collections.singletonList(new ShardingSphereColumn("id", Types.INTEGER, true, false, false, true, false, false)),
+        schema.getTables().put("t_warehouse", new ShardingSphereTable("t_warehouse", Arrays.asList(
+                new ShardingSphereColumn("id", Types.INTEGER, true, false, false, true, false, false),
+                new ShardingSphereColumn("warehouse_name", Types.VARCHAR, false, false, false, true, false, false)),
                 Collections.emptyList(), Collections.emptyList()));
         schema.getTables().put("t_order", new ShardingSphereTable("t_order", Arrays.asList(
                 new ShardingSphereColumn("warehouse_id", Types.INTEGER, false, false, false, true, false, false),
@@ -132,7 +136,7 @@ class ShardingRouteCacheableCheckerTest {
                 new ShardingSphereColumn("id", Types.INTEGER, false, false, false, true, false, false)),
                 Collections.emptyList(), Collections.emptyList()));
         return new ShardingSphereDatabase(DATABASE_NAME, TypedSPILoader.getService(DatabaseType.class, "PostgreSQL"),
-                new ResourceMetaData(DATABASE_NAME, Collections.emptyMap()), new RuleMetaData(Arrays.asList(shardingRule, timestampServiceRule)),
+                new ResourceMetaData(Collections.emptyMap()), new RuleMetaData(Arrays.asList(shardingRule, timestampServiceRule)),
                 Collections.singletonMap(SCHEMA_NAME, schema));
     }
     
@@ -148,7 +152,7 @@ class ShardingRouteCacheableCheckerTest {
     
     private SQLStatement parse(final String sql) {
         CacheOption cacheOption = new CacheOption(0, 0);
-        return new SQLStatementParserEngine(TypedSPILoader.getService(DatabaseType.class, "PostgreSQL"), cacheOption, cacheOption, false).parse(sql, false);
+        return new SQLStatementParserEngine(TypedSPILoader.getService(DatabaseType.class, "PostgreSQL"), cacheOption, cacheOption).parse(sql, false);
     }
     
     private static class TestCaseArgumentsProvider implements ArgumentsProvider {

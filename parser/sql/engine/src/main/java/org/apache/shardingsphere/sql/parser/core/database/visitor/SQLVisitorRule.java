@@ -693,7 +693,19 @@ public enum SQLVisitorRule {
     
     SYSTEM_ACTION("SystemAction", SQLStatementType.DDL),
     
-    EMPTY_STATEMENT("EmptyStatement", SQLStatementType.DAL);
+    EMPTY_STATEMENT("EmptyStatement", SQLStatementType.DAL),
+    
+    CREATE_JAVA("CreateJava", SQLStatementType.DDL),
+    
+    PLSQL_BLOCK("PlsqlBlock", SQLStatementType.DDL),
+    
+    CREATE_LIBRARY("CreateLibrary", SQLStatementType.DDL),
+    
+    SWITCH("Switch", SQLStatementType.DDL),
+    
+    CREATE_PROFILE("CreateProfile", SQLStatementType.DDL),
+    
+    UPDATE_STATISTICS("UpdateStatistics", SQLStatementType.DDL);
     
     private final String name;
     

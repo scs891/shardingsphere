@@ -22,11 +22,11 @@ import com.google.common.base.Strings;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.shardingsphere.data.pipeline.api.datasource.config.impl.ShardingSpherePipelineDataSourceConfiguration;
-import org.apache.shardingsphere.data.pipeline.cdc.api.job.type.CDCJobType;
-import org.apache.shardingsphere.data.pipeline.common.datasource.PipelineDataSourceFactory;
-import org.apache.shardingsphere.data.pipeline.common.job.JobStatus;
-import org.apache.shardingsphere.data.pipeline.common.job.type.JobType;
+import org.apache.shardingsphere.data.pipeline.api.type.ShardingSpherePipelineDataSourceConfiguration;
+import org.apache.shardingsphere.data.pipeline.cdc.CDCJobType;
+import org.apache.shardingsphere.data.pipeline.core.datasource.PipelineDataSourceWrapper;
+import org.apache.shardingsphere.data.pipeline.core.job.JobStatus;
+import org.apache.shardingsphere.data.pipeline.core.job.type.PipelineJobType;
 import org.apache.shardingsphere.infra.database.core.connector.url.JdbcUrlAppender;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseTypeRegistry;
@@ -38,7 +38,6 @@ import org.apache.shardingsphere.infra.exception.core.ShardingSpherePrecondition
 import org.apache.shardingsphere.infra.util.yaml.YamlEngine;
 import org.apache.shardingsphere.infra.yaml.config.pojo.YamlRootConfiguration;
 import org.apache.shardingsphere.single.yaml.config.pojo.YamlSingleRuleConfiguration;
-import org.apache.shardingsphere.test.e2e.data.pipeline.cases.base.BaseIncrementTask;
 import org.apache.shardingsphere.test.e2e.data.pipeline.command.ExtraSQLCommand;
 import org.apache.shardingsphere.test.e2e.data.pipeline.env.PipelineE2EEnvironment;
 import org.apache.shardingsphere.test.e2e.data.pipeline.env.enums.PipelineEnvTypeEnum;
@@ -61,6 +60,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -117,7 +117,7 @@ public final class PipelineContainerComposer implements AutoCloseable {
     
     private Thread increaseTaskThread;
     
-    public PipelineContainerComposer(final PipelineTestParameter testParam, final JobType jobType) {
+    public PipelineContainerComposer(final PipelineTestParameter testParam, final PipelineJobType jobType) {
         databaseType = testParam.getDatabaseType();
         containerComposer = PipelineE2EEnvironment.getInstance().getItEnvType() == PipelineEnvTypeEnum.DOCKER
                 ? new DockerContainerComposer(testParam.getDatabaseType(), testParam.getStorageContainerImage(), testParam.getStorageContainerCount())
@@ -139,7 +139,7 @@ public final class PipelineContainerComposer implements AutoCloseable {
     }
     
     @SneakyThrows(SQLException.class)
-    private void init(final JobType jobType) {
+    private void init(final PipelineJobType jobType) {
         String jdbcUrl = containerComposer.getProxyJdbcUrl(databaseType instanceof PostgreSQLDatabaseType || databaseType instanceof OpenGaussDatabaseType ? "postgres" : "");
         try (Connection connection = DriverManager.getConnection(jdbcUrl, ProxyContainerConstants.USERNAME, ProxyContainerConstants.PASSWORD)) {
             cleanUpPipelineJobs(connection, jobType);
@@ -149,7 +149,7 @@ public final class PipelineContainerComposer implements AutoCloseable {
         cleanUpDataSource();
     }
     
-    private void cleanUpPipelineJobs(final Connection connection, final JobType jobType) throws SQLException {
+    private void cleanUpPipelineJobs(final Connection connection, final PipelineJobType jobType) throws SQLException {
         if (PipelineEnvTypeEnum.NATIVE != PipelineE2EEnvironment.getInstance().getItEnvType()) {
             return;
         }
@@ -228,13 +228,14 @@ public final class PipelineContainerComposer implements AutoCloseable {
      * @throws SQLException SQL exception
      */
     public void registerStorageUnit(final String storageUnitName) throws SQLException {
-        String username = getDatabaseType() instanceof OracleDatabaseType ? storageUnitName : getUsername();
+        String username = databaseType instanceof OracleDatabaseType ? storageUnitName : getUsername();
         String registerStorageUnitTemplate = "REGISTER STORAGE UNIT ${ds} ( URL='${url}', USER='${user}', PASSWORD='${password}')".replace("${ds}", storageUnitName)
                 .replace("${user}", username)
                 .replace("${password}", getPassword())
                 .replace("${url}", getActualJdbcUrlTemplate(storageUnitName, true));
         proxyExecuteWithLog(registerStorageUnitTemplate, 0);
-        Awaitility.await().ignoreExceptions().atMost(10, TimeUnit.SECONDS).pollInterval(1, TimeUnit.SECONDS).until(() -> showStorageUnitsName().contains(storageUnitName));
+        int timeout = databaseType instanceof OpenGaussDatabaseType ? 60 : 10;
+        Awaitility.await().ignoreExceptions().atMost(timeout, TimeUnit.SECONDS).pollInterval(1, TimeUnit.SECONDS).until(() -> showStorageUnitsName().contains(storageUnitName));
     }
     
     /**
@@ -420,9 +421,11 @@ public final class PipelineContainerComposer implements AutoCloseable {
      */
     public List<Map<String, Object>> queryForListWithLog(final DataSource dataSource, final String sql) {
         log.info("Query SQL: {}", sql);
-        try (Connection connection = dataSource.getConnection()) {
-            ResultSet resultSet = connection.createStatement().executeQuery(sql);
-            return transformResultSetToList(resultSet);
+        try (
+                Connection connection = dataSource.getConnection();
+                Statement statement = connection.createStatement()) {
+            statement.execute(sql);
+            return transformResultSetToList(statement.getResultSet());
         } catch (final SQLException ex) {
             throw new RuntimeException(ex);
         }
@@ -452,10 +455,10 @@ public final class PipelineContainerComposer implements AutoCloseable {
     /**
      * Start increment task.
      *
-     * @param baseIncrementTask base increment task
+     * @param task increment task
      */
-    public void startIncrementTask(final BaseIncrementTask baseIncrementTask) {
-        increaseTaskThread = new Thread(baseIncrementTask);
+    public void startIncrementTask(final Runnable task) {
+        increaseTaskThread = new Thread(task);
         increaseTaskThread.start();
     }
     
@@ -475,7 +478,7 @@ public final class PipelineContainerComposer implements AutoCloseable {
             for (Map<String, Object> each : listJobStatus) {
                 assertTrue(Strings.isNullOrEmpty((String) each.get("error_message")), "error_message: `" + each.get("error_message") + "`");
                 actualStatus.add(each.get("status").toString());
-                String incrementalIdleSeconds = each.get("incremental_idle_seconds").toString();
+                String incrementalIdleSeconds = (String) each.get("incremental_idle_seconds");
                 incrementalIdleSecondsList.add(Strings.isNullOrEmpty(incrementalIdleSeconds) ? 0 : Integer.parseInt(incrementalIdleSeconds));
             }
             if (Collections.min(incrementalIdleSecondsList) <= 5) {
@@ -558,7 +561,7 @@ public final class PipelineContainerComposer implements AutoCloseable {
      */
     // TODO proxy support for some fields still needs to be optimized, such as binary of MySQL, after these problems are optimized, Proxy dataSource can be used.
     public DataSource generateShardingSphereDataSourceFromProxy() {
-        Awaitility.await().atMost(5L, TimeUnit.SECONDS).pollInterval(1L, TimeUnit.SECONDS).until(() -> null != getYamlRootConfig().getRules());
+        Awaitility.await().atMost(10L, TimeUnit.SECONDS).pollInterval(1L, TimeUnit.SECONDS).until(() -> null != getYamlRootConfig().getRules());
         YamlRootConfiguration rootConfig = getYamlRootConfig();
         ShardingSpherePreconditions.checkNotNull(rootConfig.getDataSources(), () -> new IllegalStateException("dataSources is null"));
         ShardingSpherePreconditions.checkNotNull(rootConfig.getRules(), () -> new IllegalStateException("rules is null"));
@@ -576,7 +579,7 @@ public final class PipelineContainerComposer implements AutoCloseable {
         YamlSingleRuleConfiguration singleRuleConfig = new YamlSingleRuleConfiguration();
         singleRuleConfig.setTables(Collections.singletonList("*.*"));
         rootConfig.getRules().add(singleRuleConfig);
-        return PipelineDataSourceFactory.newInstance(new ShardingSpherePipelineDataSourceConfiguration(rootConfig));
+        return new PipelineDataSourceWrapper(new ShardingSpherePipelineDataSourceConfiguration(rootConfig));
     }
     
     private YamlRootConfiguration getYamlRootConfig() {

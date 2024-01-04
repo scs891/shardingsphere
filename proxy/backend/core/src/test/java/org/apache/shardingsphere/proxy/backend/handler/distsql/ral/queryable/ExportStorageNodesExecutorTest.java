@@ -20,8 +20,8 @@ package org.apache.shardingsphere.proxy.backend.handler.distsql.ral.queryable;
 import lombok.SneakyThrows;
 import org.apache.shardingsphere.authority.rule.AuthorityRule;
 import org.apache.shardingsphere.authority.rule.builder.DefaultAuthorityRuleConfigurationBuilder;
-import org.apache.shardingsphere.distsql.parser.statement.ral.queryable.ExportStorageNodesStatement;
-import org.apache.shardingsphere.infra.config.algorithm.AlgorithmConfiguration;
+import org.apache.shardingsphere.distsql.statement.ral.queryable.export.ExportStorageNodesStatement;
+import org.apache.shardingsphere.infra.algorithm.core.config.AlgorithmConfiguration;
 import org.apache.shardingsphere.infra.config.props.ConfigurationProperties;
 import org.apache.shardingsphere.infra.config.props.ConfigurationPropertyKey;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
@@ -54,13 +54,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
+import javax.sql.DataSource;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -87,22 +87,12 @@ class ExportStorageNodesExecutorTest {
     }
     
     @Test
-    void assertGetColumns() {
-        Collection<String> columns = new ExportStorageNodesExecutor().getColumnNames();
-        assertThat(columns.size(), is(3));
-        Iterator<String> columnIterator = columns.iterator();
-        assertThat(columnIterator.next(), is("id"));
-        assertThat(columnIterator.next(), is("create_time"));
-        assertThat(columnIterator.next(), is("storage_nodes"));
-    }
-    
-    @Test
     void assertExecuteWithWrongDatabaseName() {
         ContextManager contextManager = mockEmptyContextManager();
         when(ProxyContext.getInstance().getContextManager()).thenReturn(contextManager);
         when(ProxyContext.getInstance().getAllDatabaseNames()).thenReturn(Collections.singleton("empty_metadata"));
         ExportStorageNodesStatement sqlStatement = new ExportStorageNodesStatement("foo", null);
-        assertThrows(IllegalArgumentException.class, () -> new ExportStorageNodesExecutor().getRows(contextManager.getMetaDataContexts().getMetaData(), sqlStatement));
+        assertThrows(IllegalArgumentException.class, () -> new ExportStorageNodesExecutor().getRows(sqlStatement, contextManager));
     }
     
     @Test
@@ -111,7 +101,7 @@ class ExportStorageNodesExecutorTest {
         when(ProxyContext.getInstance().getContextManager()).thenReturn(contextManager);
         when(ProxyContext.getInstance().getAllDatabaseNames()).thenReturn(Collections.singleton("empty_metadata"));
         ExportStorageNodesStatement sqlStatement = new ExportStorageNodesStatement(null, null);
-        Collection<LocalDataQueryResultRow> actual = new ExportStorageNodesExecutor().getRows(contextManager.getMetaDataContexts().getMetaData(), sqlStatement);
+        Collection<LocalDataQueryResultRow> actual = new ExportStorageNodesExecutor().getRows(sqlStatement, contextManager);
         assertThat(actual.size(), is(1));
         LocalDataQueryResultRow row = actual.iterator().next();
         assertThat(row.getCell(3), is("{\"storage_nodes\":{}}"));
@@ -129,11 +119,11 @@ class ExportStorageNodesExecutorTest {
     void assertExecute() {
         when(database.getName()).thenReturn("normal_db");
         Map<String, StorageUnit> storageUnits = createStorageUnits();
-        when(database.getResourceMetaData().getStorageUnitMetaData().getStorageUnits()).thenReturn(storageUnits);
+        when(database.getResourceMetaData().getStorageUnits()).thenReturn(storageUnits);
         when(database.getRuleMetaData().getConfigurations()).thenReturn(Collections.singleton(createShardingRuleConfiguration()));
         ContextManager contextManager = mockContextManager();
         when(ProxyContext.getInstance().getContextManager()).thenReturn(contextManager);
-        Collection<LocalDataQueryResultRow> actual = new ExportStorageNodesExecutor().getRows(contextManager.getMetaDataContexts().getMetaData(), new ExportStorageNodesStatement(null, null));
+        Collection<LocalDataQueryResultRow> actual = new ExportStorageNodesExecutor().getRows(new ExportStorageNodesStatement(null, null), contextManager);
         assertThat(actual.size(), is(1));
         LocalDataQueryResultRow row = actual.iterator().next();
         assertThat(row.getCell(3), is(loadExpectedRow()));
@@ -143,11 +133,11 @@ class ExportStorageNodesExecutorTest {
     void assertExecuteWithDatabaseName() {
         when(database.getName()).thenReturn("normal_db");
         Map<String, StorageUnit> storageUnits = createStorageUnits();
-        when(database.getResourceMetaData().getStorageUnitMetaData().getStorageUnits()).thenReturn(storageUnits);
+        when(database.getResourceMetaData().getStorageUnits()).thenReturn(storageUnits);
         when(database.getRuleMetaData().getConfigurations()).thenReturn(Collections.singleton(createShardingRuleConfiguration()));
         ContextManager contextManager = mockContextManager();
         when(ProxyContext.getInstance().getContextManager()).thenReturn(contextManager);
-        Collection<LocalDataQueryResultRow> actual = new ExportStorageNodesExecutor().getRows(contextManager.getMetaDataContexts().getMetaData(), new ExportStorageNodesStatement("normal_db", null));
+        Collection<LocalDataQueryResultRow> actual = new ExportStorageNodesExecutor().getRows(new ExportStorageNodesStatement("normal_db", null), contextManager);
         assertThat(actual.size(), is(1));
         LocalDataQueryResultRow row = actual.iterator().next();
         assertThat(row.getCell(3), is(loadExpectedRow()));
@@ -164,21 +154,23 @@ class ExportStorageNodesExecutorTest {
     }
     
     private Map<String, StorageUnit> createStorageUnits() {
+        StorageUnit storageUnit1 = mock(StorageUnit.class, RETURNS_DEEP_STUBS);
+        when(storageUnit1.getDataSource()).thenReturn(createDataSource("ds_0"));
+        StorageUnit storageUnit2 = mock(StorageUnit.class, RETURNS_DEEP_STUBS);
+        when(storageUnit2.getDataSource()).thenReturn(createDataSource("ds_2"));
         Map<String, StorageUnit> result = new LinkedHashMap<>(2, 1F);
-        result.put("ds_0", createStorageUnit("demo_ds_0"));
-        result.put("ds_1", createStorageUnit("demo_ds_1"));
+        result.put("ds_0", storageUnit1);
+        result.put("ds_1", storageUnit2);
         return result;
     }
     
-    private StorageUnit createStorageUnit(final String name) {
-        MockedDataSource dataSource = new MockedDataSource();
-        dataSource.setUrl(String.format("jdbc:mock://127.0.0.1/%s", name));
-        dataSource.setUsername("root");
-        dataSource.setPassword("test");
-        dataSource.setMaxPoolSize(50);
-        dataSource.setMinPoolSize(1);
-        StorageUnit result = mock(StorageUnit.class);
-        when(result.getDataSource()).thenReturn(dataSource);
+    private DataSource createDataSource(final String name) {
+        MockedDataSource result = new MockedDataSource();
+        result.setUrl(String.format("jdbc:mock://127.0.0.1/%s", name));
+        result.setUsername("root");
+        result.setPassword("test");
+        result.setMaxPoolSize(50);
+        result.setMinPoolSize(1);
         return result;
     }
     

@@ -29,7 +29,7 @@ import org.apache.shardingsphere.infra.binder.context.statement.SQLStatementCont
 import org.apache.shardingsphere.infra.binder.context.statement.dml.InsertStatementContext;
 import org.apache.shardingsphere.infra.binder.context.statement.dml.SelectStatementContext;
 import org.apache.shardingsphere.infra.binder.context.statement.dml.UpdateStatementContext;
-import org.apache.shardingsphere.infra.config.algorithm.AlgorithmConfiguration;
+import org.apache.shardingsphere.infra.algorithm.core.config.AlgorithmConfiguration;
 import org.apache.shardingsphere.infra.config.props.ConfigurationProperties;
 import org.apache.shardingsphere.infra.database.core.DefaultDatabase;
 import org.apache.shardingsphere.infra.metadata.ShardingSphereMetaData;
@@ -154,7 +154,7 @@ public final class EncryptGeneratorFixtureBuilder {
                 new IdentifierValue("status")));
         projections.getProjections().add(new ColumnProjectionSegment(statusColumn));
         selectStatement.setProjections(projections);
-        result.setInsertSelect(new SubquerySegment(0, 0, selectStatement));
+        result.setInsertSelect(new SubquerySegment(0, 0, selectStatement, ""));
         return result;
     }
     

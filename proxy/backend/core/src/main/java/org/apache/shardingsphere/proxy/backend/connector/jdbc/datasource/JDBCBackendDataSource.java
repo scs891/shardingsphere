@@ -69,7 +69,7 @@ public final class JDBCBackendDataSource implements BackendDataSource {
     public List<Connection> getConnections(final String databaseName, final String dataSourceName,
                                            final int connectionSize, final ConnectionMode connectionMode, final TransactionType transactionType) throws SQLException {
         DataSource dataSource = ProxyContext.getInstance().getContextManager().getMetaDataContexts().getMetaData()
-                .getDatabase(databaseName).getResourceMetaData().getStorageUnitMetaData().getStorageUnits().get(dataSourceName).getDataSource();
+                .getDatabase(databaseName).getResourceMetaData().getStorageUnits().get(dataSourceName).getDataSource();
         if (dataSourceName.contains(".")) {
             String dataSourceStr = dataSourceName.split("\\.")[0];
             if (GlobalDataSourceRegistry.getInstance().getCachedDataSources().containsKey(dataSourceStr)) {
@@ -94,11 +94,11 @@ public final class JDBCBackendDataSource implements BackendDataSource {
         for (int i = 0; i < connectionSize; i++) {
             try {
                 result.add(createConnection(databaseName, dataSourceName, dataSource, transactionType));
-            } catch (final SQLException ignored) {
+            } catch (final SQLException ex) {
                 for (Connection each : result) {
                     each.close();
                 }
-                throw new OverallConnectionNotEnoughException(connectionSize, result.size());
+                throw new OverallConnectionNotEnoughException(connectionSize, result.size(), ex);
             }
         }
         return result;

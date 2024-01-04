@@ -23,17 +23,21 @@ import org.apache.shardingsphere.infra.database.core.metadata.data.loader.MetaDa
 import org.apache.shardingsphere.infra.database.core.metadata.data.model.SchemaMetaData;
 import org.apache.shardingsphere.infra.database.core.metadata.data.model.TableMetaData;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
-import org.apache.shardingsphere.infra.metadata.database.schema.fixture.rule.TableContainedFixtureRule;
 import org.apache.shardingsphere.infra.metadata.database.schema.model.ShardingSphereSchema;
 import org.apache.shardingsphere.infra.metadata.database.schema.model.ShardingSphereTable;
+import org.apache.shardingsphere.infra.rule.ShardingSphereRule;
+import org.apache.shardingsphere.infra.rule.identifier.type.RuleIdentifiers;
+import org.apache.shardingsphere.infra.rule.identifier.type.table.TableMapperRule;
 import org.apache.shardingsphere.infra.spi.type.typed.TypedSPILoader;
+import org.apache.shardingsphere.test.fixture.jdbc.MockedDataSource;
 import org.apache.shardingsphere.test.mock.AutoMockExtension;
 import org.apache.shardingsphere.test.mock.StaticMockSettings;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 
-import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Collection;
@@ -51,6 +55,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(AutoMockExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @StaticMockSettings(MetaDataLoader.class)
 class GenericSchemaBuilderTest {
     
@@ -59,9 +64,11 @@ class GenericSchemaBuilderTest {
     @BeforeEach
     void setUp() {
         DatabaseType databaseType = TypedSPILoader.getService(DatabaseType.class, "FIXTURE");
+        ShardingSphereRule rule = mock(ShardingSphereRule.class);
+        when(rule.getRuleIdentifiers()).thenReturn(new RuleIdentifiers(mock(TableMapperRule.class)));
         material = new GenericSchemaBuilderMaterial(databaseType, Collections.singletonMap(DefaultDatabase.LOGIC_NAME, databaseType),
-                Collections.singletonMap(DefaultDatabase.LOGIC_NAME, mock(DataSource.class)),
-                Collections.singleton(new TableContainedFixtureRule()), new ConfigurationProperties(new Properties()), DefaultDatabase.LOGIC_NAME);
+                Collections.singletonMap(DefaultDatabase.LOGIC_NAME, new MockedDataSource()),
+                Collections.singleton(rule), new ConfigurationProperties(new Properties()), DefaultDatabase.LOGIC_NAME);
     }
     
     @Test

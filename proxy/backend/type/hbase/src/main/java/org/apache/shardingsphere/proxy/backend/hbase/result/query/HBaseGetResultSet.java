@@ -17,6 +17,7 @@
 
 package org.apache.shardingsphere.proxy.backend.hbase.result.query;
 
+import com.cedarsoftware.util.CaseInsensitiveMap;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hadoop.hbase.Cell;
@@ -48,10 +49,10 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -140,11 +141,22 @@ public final class HBaseGetResultSet implements HBaseQueryResultSet {
         if (rows.hasNext()) {
             compensateResult = rows.next();
         }
-        columnNames = null == compensateResult ? Arrays.asList(ROW_KEY_COLUMN_NAME, CONTENT_COLUMN_NAME) : parseResult(compensateResult).keySet();
+        columnNames = null == compensateResult ? Arrays.asList(ROW_KEY_COLUMN_NAME, CONTENT_COLUMN_NAME) : parseResultColumnNames(compensateResult);
+    }
+    
+    private Collection<String> parseResultColumnNames(final Result result) {
+        Collection<String> columnNames = new LinkedList<>();
+        columnNames.add(ROW_KEY_COLUMN_NAME);
+        for (Cell each : result.listCells()) {
+            String column = new String(CellUtil.cloneQualifier(each), StandardCharsets.UTF_8);
+            columnNames.add(column);
+        }
+        columnNames.add(TIMESTAMP_COLUMN_NAME);
+        return columnNames;
     }
     
     private Map<String, String> parseResult(final Result result) {
-        Map<String, String> row = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        Map<String, String> row = new CaseInsensitiveMap<>();
         row.put(ROW_KEY_COLUMN_NAME, Bytes.toString(result.getRow()));
         Long timestamp = null;
         for (Cell each : result.listCells()) {

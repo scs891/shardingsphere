@@ -27,8 +27,10 @@ import org.apache.shardingsphere.infra.metadata.ShardingSphereMetaData;
 import org.apache.shardingsphere.infra.metadata.database.ShardingSphereDatabase;
 import org.apache.shardingsphere.infra.metadata.database.schema.QualifiedDatabase;
 import org.apache.shardingsphere.infra.metadata.database.schema.model.ShardingSphereSchema;
+import org.apache.shardingsphere.infra.rule.ShardingSphereRule;
 import org.apache.shardingsphere.infra.rule.identifier.type.ResourceHeldRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.StaticDataSourceContainedRule;
+import org.apache.shardingsphere.infra.rule.identifier.type.RuleIdentifiers;
+import org.apache.shardingsphere.infra.rule.identifier.type.datasource.StaticDataSourceRule;
 import org.apache.shardingsphere.infra.spi.type.typed.TypedSPILoader;
 import org.apache.shardingsphere.infra.state.cluster.ClusterState;
 import org.apache.shardingsphere.infra.state.datasource.DataSourceState;
@@ -68,7 +70,6 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Properties;
 
 import static org.hamcrest.CoreMatchers.is;
@@ -117,8 +118,10 @@ class StateChangedSubscriberTest {
     
     @Test
     void assertRenewForDisableStateChanged() {
-        StaticDataSourceContainedRule staticDataSourceRule = mock(StaticDataSourceContainedRule.class);
-        when(database.getRuleMetaData().findSingleRule(StaticDataSourceContainedRule.class)).thenReturn(Optional.of(staticDataSourceRule));
+        StaticDataSourceRule staticDataSourceRule = mock(StaticDataSourceRule.class);
+        ShardingSphereRule rule = mock(ShardingSphereRule.class);
+        when(rule.getRuleIdentifiers()).thenReturn(new RuleIdentifiers(staticDataSourceRule));
+        when(database.getRuleMetaData().getRules()).thenReturn(Collections.singleton(rule));
         StorageNodeChangedEvent event = new StorageNodeChangedEvent(new QualifiedDatabase("db.readwrite_ds.ds_0"), new StorageNodeDataSource(StorageNodeRole.MEMBER, DataSourceState.DISABLED));
         subscriber.renew(event);
         verify(staticDataSourceRule).updateStatus(argThat(

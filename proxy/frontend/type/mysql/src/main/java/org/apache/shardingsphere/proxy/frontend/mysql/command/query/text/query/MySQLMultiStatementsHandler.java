@@ -17,8 +17,8 @@
 
 package org.apache.shardingsphere.proxy.frontend.mysql.command.query.text.query;
 
-import org.apache.shardingsphere.infra.binder.engine.SQLBindEngine;
 import org.apache.shardingsphere.infra.binder.context.statement.SQLStatementContext;
+import org.apache.shardingsphere.infra.binder.engine.SQLBindEngine;
 import org.apache.shardingsphere.infra.config.props.ConfigurationPropertyKey;
 import org.apache.shardingsphere.infra.connection.kernel.KernelProcessor;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
@@ -88,9 +88,7 @@ public final class MySQLMultiStatementsHandler implements ProxyBackendHandler {
     
     private final MetaDataContexts metaDataContexts = ProxyContext.getInstance().getContextManager().getMetaDataContexts();
     
-    private final Map<String, List<ExecutionUnit>> dataSourcesToExecutionUnits = new HashMap<>();
-    
-    private ExecutionContext anyExecutionContext;
+    private final Collection<QueryContext> multiSQLQueryContexts = new LinkedList<>();
     
     public MySQLMultiStatementsHandler(final ConnectionSession connectionSession, final SQLStatement sqlStatementSample, final String sql) {
         jdbcExecutor = new JDBCExecutor(BackendExecutorContext.getInstance().getExecutorEngine(), connectionSession.getConnectionContext());
@@ -101,13 +99,7 @@ public final class MySQLMultiStatementsHandler implements ProxyBackendHandler {
         SQLParserEngine sqlParserEngine = getSQLParserEngine();
         for (String each : extractMultiStatements(pattern, sql)) {
             SQLStatement eachSQLStatement = sqlParserEngine.parse(each, false);
-            ExecutionContext executionContext = createExecutionContext(createQueryContext(each, eachSQLStatement));
-            if (null == anyExecutionContext) {
-                anyExecutionContext = executionContext;
-            }
-            for (ExecutionUnit eachExecutionUnit : executionContext.getExecutionUnits()) {
-                dataSourcesToExecutionUnits.computeIfAbsent(eachExecutionUnit.getDataSourceName(), unused -> new LinkedList<>()).add(eachExecutionUnit);
-            }
+            multiSQLQueryContexts.add(createQueryContext(each, eachSQLStatement));
         }
     }
     
@@ -127,6 +119,48 @@ public final class MySQLMultiStatementsHandler implements ProxyBackendHandler {
         return new QueryContext(sqlStatementContext, sql, Collections.emptyList());
     }
     
+    @Override
+    public ResponseHeader execute() throws SQLException {
+        Collection<ShardingSphereRule> rules = metaDataContexts.getMetaData().getDatabase(connectionSession.getDatabaseName()).getRuleMetaData().getRules();
+        DriverExecutionPrepareEngine<JDBCExecutionUnit, Connection> prepareEngine = new DriverExecutionPrepareEngine<>(JDBCDriverType.STATEMENT, metaDataContexts.getMetaData().getProps()
+                .<Integer>getValue(ConfigurationPropertyKey.MAX_CONNECTIONS_SIZE_PER_QUERY), connectionSession.getDatabaseConnectionManager(),
+                (JDBCBackendStatement) connectionSession.getStatementManager(), new StatementOption(false), rules,
+                metaDataContexts.getMetaData().getDatabase(connectionSession.getDatabaseName()).getResourceMetaData().getStorageUnits());
+        return executeMultiStatements(prepareEngine);
+    }
+    
+    private UpdateResponseHeader executeMultiStatements(final DriverExecutionPrepareEngine<JDBCExecutionUnit, Connection> prepareEngine) throws SQLException {
+        Collection<ExecutionContext> executionContexts = createExecutionContexts();
+        Map<String, List<ExecutionUnit>> dataSourcesToExecutionUnits = buildDataSourcesToExecutionUnits(executionContexts);
+        ExecutionGroupContext<JDBCExecutionUnit> executionGroupContext =
+                prepareEngine.prepare(executionContexts.iterator().next().getRouteContext(), samplingExecutionUnit(dataSourcesToExecutionUnits),
+                        new ExecutionGroupReportContext(connectionSession.getProcessId(), connectionSession.getDatabaseName(), connectionSession.getGrantee()));
+        for (ExecutionGroup<JDBCExecutionUnit> each : executionGroupContext.getInputGroups()) {
+            for (JDBCExecutionUnit unit : each.getInputs()) {
+                prepareBatchedStatement(unit, dataSourcesToExecutionUnits);
+            }
+        }
+        return executeBatchedStatements(executionGroupContext);
+    }
+    
+    private Collection<ExecutionContext> createExecutionContexts() {
+        Collection<ExecutionContext> result = new LinkedList<>();
+        for (QueryContext each : multiSQLQueryContexts) {
+            result.add(createExecutionContext(each));
+        }
+        return result;
+    }
+    
+    private Map<String, List<ExecutionUnit>> buildDataSourcesToExecutionUnits(final Collection<ExecutionContext> executionContexts) {
+        Map<String, List<ExecutionUnit>> result = new HashMap<>();
+        for (ExecutionContext each : executionContexts) {
+            for (ExecutionUnit executionUnit : each.getExecutionUnits()) {
+                result.computeIfAbsent(executionUnit.getDataSourceName(), unused -> new LinkedList<>()).add(executionUnit);
+            }
+        }
+        return result;
+    }
+    
     private ExecutionContext createExecutionContext(final QueryContext queryContext) {
         RuleMetaData globalRuleMetaData = metaDataContexts.getMetaData().getGlobalRuleMetaData();
         ShardingSphereDatabase currentDatabase = metaDataContexts.getMetaData().getDatabase(connectionSession.getDatabaseName());
@@ -134,24 +168,7 @@ public final class MySQLMultiStatementsHandler implements ProxyBackendHandler {
         return kernelProcessor.generateExecutionContext(queryContext, currentDatabase, globalRuleMetaData, metaDataContexts.getMetaData().getProps(), connectionSession.getConnectionContext());
     }
     
-    @Override
-    public ResponseHeader execute() throws SQLException {
-        Collection<ShardingSphereRule> rules = metaDataContexts.getMetaData().getDatabase(connectionSession.getDatabaseName()).getRuleMetaData().getRules();
-        DriverExecutionPrepareEngine<JDBCExecutionUnit, Connection> prepareEngine = new DriverExecutionPrepareEngine<>(JDBCDriverType.STATEMENT, metaDataContexts.getMetaData().getProps()
-                .<Integer>getValue(ConfigurationPropertyKey.MAX_CONNECTIONS_SIZE_PER_QUERY), connectionSession.getDatabaseConnectionManager(),
-                (JDBCBackendStatement) connectionSession.getStatementManager(), new StatementOption(false), rules,
-                metaDataContexts.getMetaData().getDatabase(connectionSession.getDatabaseName()).getResourceMetaData().getStorageUnitMetaData());
-        ExecutionGroupContext<JDBCExecutionUnit> executionGroupContext = prepareEngine.prepare(anyExecutionContext.getRouteContext(), samplingExecutionUnit(),
-                new ExecutionGroupReportContext(connectionSession.getProcessId(), connectionSession.getDatabaseName(), connectionSession.getGrantee()));
-        for (ExecutionGroup<JDBCExecutionUnit> eachGroup : executionGroupContext.getInputGroups()) {
-            for (JDBCExecutionUnit each : eachGroup.getInputs()) {
-                prepareBatchedStatement(each);
-            }
-        }
-        return executeBatchedStatements(executionGroupContext);
-    }
-    
-    private Collection<ExecutionUnit> samplingExecutionUnit() {
+    private Collection<ExecutionUnit> samplingExecutionUnit(final Map<String, List<ExecutionUnit>> dataSourcesToExecutionUnits) {
         Collection<ExecutionUnit> result = new LinkedList<>();
         for (List<ExecutionUnit> each : dataSourcesToExecutionUnits.values()) {
             result.add(each.get(0));
@@ -159,10 +176,10 @@ public final class MySQLMultiStatementsHandler implements ProxyBackendHandler {
         return result;
     }
     
-    private void prepareBatchedStatement(final JDBCExecutionUnit each) throws SQLException {
-        Statement statement = each.getStorageResource();
-        for (ExecutionUnit eachExecutionUnit : dataSourcesToExecutionUnits.get(each.getExecutionUnit().getDataSourceName())) {
-            statement.addBatch(eachExecutionUnit.getSqlUnit().getSql());
+    private void prepareBatchedStatement(final JDBCExecutionUnit executionUnit, final Map<String, List<ExecutionUnit>> dataSourcesToExecutionUnits) throws SQLException {
+        Statement statement = executionUnit.getStorageResource();
+        for (ExecutionUnit each : dataSourcesToExecutionUnits.get(executionUnit.getExecutionUnit().getDataSourceName())) {
+            statement.addBatch(each.getSqlUnit().getSql());
         }
     }
     

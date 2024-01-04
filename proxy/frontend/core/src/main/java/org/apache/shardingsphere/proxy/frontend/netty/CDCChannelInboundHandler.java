@@ -44,12 +44,13 @@ import org.apache.shardingsphere.data.pipeline.cdc.protocol.response.ServerGreet
 import org.apache.shardingsphere.data.pipeline.core.exception.param.PipelineInvalidParameterException;
 import org.apache.shardingsphere.distsql.handler.exception.rule.MissingRequiredRuleException;
 import org.apache.shardingsphere.infra.autogen.version.ShardingSphereVersion;
-import org.apache.shardingsphere.infra.executor.audit.exception.SQLAuditException;
-import org.apache.shardingsphere.infra.metadata.user.Grantee;
-import org.apache.shardingsphere.infra.metadata.user.ShardingSphereUser;
 import org.apache.shardingsphere.infra.exception.core.ShardingSpherePreconditions;
 import org.apache.shardingsphere.infra.exception.core.external.sql.ShardingSphereSQLException;
 import org.apache.shardingsphere.infra.exception.core.external.sql.sqlstate.XOpenSQLState;
+import org.apache.shardingsphere.infra.exception.core.external.sql.type.kernel.category.PipelineSQLException;
+import org.apache.shardingsphere.infra.executor.audit.exception.SQLAuditException;
+import org.apache.shardingsphere.infra.metadata.user.Grantee;
+import org.apache.shardingsphere.infra.metadata.user.ShardingSphereUser;
 import org.apache.shardingsphere.proxy.backend.context.ProxyContext;
 
 import java.net.InetSocketAddress;
@@ -150,7 +151,7 @@ public final class CDCChannelInboundHandler extends ChannelInboundHandlerAdapter
         AuthorityRule authorityRule = ProxyContext.getInstance().getContextManager().getMetaDataContexts().getMetaData().getGlobalRuleMetaData().findSingleRule(AuthorityRule.class)
                 .orElseThrow(() -> new CDCExceptionWrapper(requestId, new MissingRequiredRuleException("authority")));
         ShardingSpherePrivileges privileges = authorityRule.findPrivileges(grantee)
-                .orElseThrow(() -> new CDCExceptionWrapper(requestId, new SQLAuditException(String.format("Access denied for user '%s'@'%s'", grantee.getUsername(), grantee.getHostname()))));
+                .orElseThrow(() -> new CDCExceptionWrapper(requestId, new SQLAuditException(String.format("Access denied for user '%s'", grantee))));
         ShardingSpherePreconditions.checkState(privileges.hasPrivileges(currentDatabase),
                 () -> new CDCExceptionWrapper(requestId, new SQLAuditException(String.format("Unknown database '%s'", currentDatabase))));
     }
@@ -172,8 +173,12 @@ public final class CDCChannelInboundHandler extends ChannelInboundHandlerAdapter
             throw new CDCExceptionWrapper(request.getRequestId(), new PipelineInvalidParameterException("Source schema table is empty"));
         }
         checkPrivileges(request.getRequestId(), connectionContext.getCurrentUser().getGrantee(), requestBody.getDatabase());
-        CDCResponse response = backendHandler.streamData(request.getRequestId(), requestBody, connectionContext, ctx.channel());
-        ctx.writeAndFlush(response);
+        try {
+            CDCResponse response = backendHandler.streamData(request.getRequestId(), requestBody, connectionContext, ctx.channel());
+            ctx.writeAndFlush(response);
+        } catch (final PipelineSQLException ex) {
+            throw new CDCExceptionWrapper(request.getRequestId(), ex);
+        }
     }
     
     private void processAckStreamingRequest(final CDCRequest request) {
@@ -205,7 +210,7 @@ public final class CDCChannelInboundHandler extends ChannelInboundHandlerAdapter
         StopStreamingRequestBody requestBody = request.getStopStreamingRequestBody();
         String database = backendHandler.getDatabaseNameByJobId(requestBody.getStreamingId());
         checkPrivileges(request.getRequestId(), connectionContext.getCurrentUser().getGrantee(), database);
-        backendHandler.stopStreaming(connectionContext.getJobId(), ctx.channel().id());
+        backendHandler.stopStreaming(requestBody.getStreamingId(), ctx.channel().id());
         connectionContext.setJobId(null);
         ctx.writeAndFlush(CDCResponseUtils.succeed(request.getRequestId()));
     }
@@ -213,7 +218,7 @@ public final class CDCChannelInboundHandler extends ChannelInboundHandlerAdapter
     private void processDropStreamingRequest(final ChannelHandlerContext ctx, final CDCRequest request, final CDCConnectionContext connectionContext) {
         DropStreamingRequestBody requestBody = request.getDropStreamingRequestBody();
         checkPrivileges(request.getRequestId(), connectionContext.getCurrentUser().getGrantee(), backendHandler.getDatabaseNameByJobId(requestBody.getStreamingId()));
-        backendHandler.dropStreaming(connectionContext.getJobId());
+        backendHandler.dropStreaming(requestBody.getStreamingId());
         connectionContext.setJobId(null);
         ctx.writeAndFlush(CDCResponseUtils.succeed(request.getRequestId()));
     }

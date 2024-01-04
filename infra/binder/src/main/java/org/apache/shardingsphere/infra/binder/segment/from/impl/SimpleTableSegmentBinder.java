@@ -29,7 +29,8 @@ import org.apache.shardingsphere.infra.database.opengauss.type.OpenGaussDatabase
 import org.apache.shardingsphere.infra.database.postgresql.type.PostgreSQLDatabaseType;
 import org.apache.shardingsphere.infra.exception.TableNotExistsException;
 import org.apache.shardingsphere.infra.exception.core.ShardingSpherePreconditions;
-import org.apache.shardingsphere.infra.metadata.database.schema.builder.SystemSchemaBuilderRule;
+import org.apache.shardingsphere.infra.exception.dialect.exception.syntax.database.NoDatabaseSelectedException;
+import org.apache.shardingsphere.infra.metadata.database.schema.manager.SystemSchemaManager;
 import org.apache.shardingsphere.infra.metadata.database.schema.model.ShardingSphereColumn;
 import org.apache.shardingsphere.infra.metadata.database.schema.model.ShardingSphereSchema;
 import org.apache.shardingsphere.infra.metadata.database.schema.model.ShardingSphereTable;
@@ -70,15 +71,16 @@ public final class SimpleTableSegmentBinder {
     /**
      * Bind simple table segment with metadata.
      *
-     * @param segment simple table segment
+     * @param segment                simple table segment
      * @param statementBinderContext statement binder context
-     * @param tableBinderContexts table binder contexts
+     * @param tableBinderContexts    table binder contexts
      * @return bounded simple table segment
      */
     public static SimpleTableSegment bind(final SimpleTableSegment segment, final SQLStatementBinderContext statementBinderContext, final Map<String, TableSegmentBinderContext> tableBinderContexts) {
         fillPivotColumnNamesInBinderContext(segment, statementBinderContext);
         IdentifierValue originalDatabase = getDatabaseName(segment, statementBinderContext);
         IdentifierValue originalSchema = getSchemaName(segment, statementBinderContext);
+        ShardingSpherePreconditions.checkNotNull(originalDatabase.getValue(), NoDatabaseSelectedException::new);
         checkTableExists(segment.getTableName().getIdentifier().getValue(), statementBinderContext, originalDatabase.getValue(), originalSchema.getValue());
         ShardingSphereSchema schema = statementBinderContext.getMetaData().getDatabase(originalDatabase.getValue()).getSchema(originalSchema.getValue());
         tableBinderContexts.put((segment.getAliasName().orElseGet(() -> segment.getTableName().getIdentifier().getValue())).toLowerCase(),
@@ -137,7 +139,10 @@ public final class SimpleTableSegmentBinder {
         if ("dual".equalsIgnoreCase(tableName)) {
             return;
         }
-        if (SystemSchemaBuilderRule.isSystemTable(schemaName, tableName)) {
+        if (SystemSchemaManager.isSystemTable(schemaName, tableName)) {
+            return;
+        }
+        if (statementBinderContext.getExternalTableBinderContexts().containsKey(tableName)) {
             return;
         }
         ShardingSpherePreconditions.checkState(statementBinderContext.getMetaData().containsDatabase(databaseName)

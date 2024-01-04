@@ -264,12 +264,12 @@ class MySQLAdminExecutorCreatorTest {
     
     @Test
     void assertCreateWithOtherSelectStatementForDatabaseName() {
-        ResourceMetaData resourceMetaData = new ResourceMetaData("sharding_db", Collections.singletonMap("ds", new MockedDataSource()));
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.singletonMap("ds", new MockedDataSource()));
         ShardingSphereDatabase database = new ShardingSphereDatabase("db_0", databaseType, resourceMetaData, mock(RuleMetaData.class), Collections.emptyMap());
         Map<String, ShardingSphereDatabase> result = Collections.singletonMap("db_0", database);
         initProxyContext(result);
         when(ProxyContext.getInstance().getAllDatabaseNames()).thenReturn(Collections.singleton("db_0"));
-        when(ProxyContext.getInstance().getDatabase("db_0")).thenReturn(database);
+        when(ProxyContext.getInstance().getContextManager().getDatabase("db_0")).thenReturn(database);
         MySQLSelectStatement selectStatement = mock(MySQLSelectStatement.class);
         when(selectStatement.getFrom()).thenReturn(null);
         ProjectionsSegment projectionsSegment = mock(ProjectionsSegment.class);
@@ -282,12 +282,12 @@ class MySQLAdminExecutorCreatorTest {
     
     @Test
     void assertCreateWithOtherSelectStatementForNullDatabaseName() {
-        ResourceMetaData resourceMetaData = new ResourceMetaData("sharding_db", Collections.singletonMap("ds_0", new MockedDataSource()));
+        ResourceMetaData resourceMetaData = new ResourceMetaData(Collections.singletonMap("ds_0", new MockedDataSource()));
         ShardingSphereDatabase database = new ShardingSphereDatabase("db_0", databaseType, resourceMetaData, mock(RuleMetaData.class), Collections.emptyMap());
         Map<String, ShardingSphereDatabase> result = Collections.singletonMap("db_0", database);
         initProxyContext(result);
         when(ProxyContext.getInstance().getAllDatabaseNames()).thenReturn(Collections.singleton("db_0"));
-        when(ProxyContext.getInstance().getDatabase("db_0")).thenReturn(database);
+        when(ProxyContext.getInstance().getContextManager().getDatabase("db_0")).thenReturn(database);
         MySQLSelectStatement selectStatement = mock(MySQLSelectStatement.class);
         when(selectStatement.getFrom()).thenReturn(null);
         ProjectionsSegment projectionsSegment = mock(ProjectionsSegment.class);
@@ -323,7 +323,7 @@ class MySQLAdminExecutorCreatorTest {
         Optional<DatabaseAdminExecutor> actual = new MySQLAdminExecutorCreator().create(sqlStatementContext, "select SCHEMA_NAME from SCHEMATA", "information_schema", Collections.emptyList());
         assertTrue(actual.isPresent());
         assertThat(actual.get(), instanceOf(SelectInformationSchemataExecutor.class));
-        when(ProxyContext.getInstance().getDatabase("information_schema").isComplete()).thenReturn(true);
+        when(ProxyContext.getInstance().getContextManager().getDatabase("information_schema").isComplete()).thenReturn(true);
         actual = new MySQLAdminExecutorCreator().create(sqlStatementContext, "select SCHEMA_NAME from SCHEMATA", "information_schema", Collections.emptyList());
         assertFalse(actual.isPresent());
     }

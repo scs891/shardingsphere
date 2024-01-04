@@ -54,14 +54,14 @@ public final class ExportUtils {
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public static void exportToFile(final String filePath, final String exportedData) {
         File file = new File(filePath);
-        if (!file.exists()) {
+        if (!file.exists() && null != file.getParentFile()) {
             file.getParentFile().mkdirs();
         }
         try (OutputStream output = Files.newOutputStream(Paths.get(file.toURI()))) {
             output.write(exportedData.getBytes());
             output.flush();
-        } catch (final IOException ex) {
-            throw new FileIOException(ex);
+        } catch (final IOException ignore) {
+            throw new FileIOException(file);
         }
     }
     
@@ -84,11 +84,11 @@ public final class ExportUtils {
     }
     
     private static void appendDataSourceConfigurations(final ShardingSphereDatabase database, final StringBuilder stringBuilder) {
-        if (database.getResourceMetaData().getStorageUnitMetaData().getStorageUnits().isEmpty()) {
+        if (database.getResourceMetaData().getStorageUnits().isEmpty()) {
             return;
         }
         stringBuilder.append("dataSources:").append(System.lineSeparator());
-        for (Entry<String, StorageUnit> entry : database.getResourceMetaData().getStorageUnitMetaData().getStorageUnits().entrySet()) {
+        for (Entry<String, StorageUnit> entry : database.getResourceMetaData().getStorageUnits().entrySet()) {
             appendDataSourceConfiguration(entry.getKey(), entry.getValue().getDataSourcePoolProperties(), stringBuilder);
         }
     }

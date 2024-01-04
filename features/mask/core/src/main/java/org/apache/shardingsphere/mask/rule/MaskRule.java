@@ -18,10 +18,8 @@
 package org.apache.shardingsphere.mask.rule;
 
 import lombok.Getter;
-import org.apache.shardingsphere.infra.config.rule.RuleConfiguration;
 import org.apache.shardingsphere.infra.rule.identifier.scope.DatabaseRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.TableContainedRule;
-import org.apache.shardingsphere.infra.rule.identifier.type.TableNamesMapper;
+import org.apache.shardingsphere.infra.rule.identifier.type.RuleIdentifiers;
 import org.apache.shardingsphere.infra.spi.type.typed.TypedSPILoader;
 import org.apache.shardingsphere.mask.api.config.MaskRuleConfiguration;
 import org.apache.shardingsphere.mask.spi.MaskAlgorithm;
@@ -34,22 +32,23 @@ import java.util.Optional;
  * Mask rule.
  */
 @SuppressWarnings("rawtypes")
-public final class MaskRule implements DatabaseRule, TableContainedRule {
+public final class MaskRule implements DatabaseRule {
     
     @Getter
-    private final RuleConfiguration configuration;
+    private final MaskRuleConfiguration configuration;
     
     private final Map<String, MaskAlgorithm> maskAlgorithms = new LinkedHashMap<>();
     
     private final Map<String, MaskTable> tables = new LinkedHashMap<>();
     
-    private final TableNamesMapper tableNamesMapper = new TableNamesMapper();
+    @Getter
+    private final RuleIdentifiers ruleIdentifiers;
     
     public MaskRule(final MaskRuleConfiguration ruleConfig) {
         configuration = ruleConfig;
         ruleConfig.getMaskAlgorithms().forEach((key, value) -> maskAlgorithms.put(key, TypedSPILoader.getService(MaskAlgorithm.class, value.getType(), value.getProps())));
         ruleConfig.getTables().forEach(each -> tables.put(each.getName().toLowerCase(), new MaskTable(each)));
-        ruleConfig.getTables().forEach(each -> tableNamesMapper.put(each.getName()));
+        ruleIdentifiers = new RuleIdentifiers(new MaskTableMapperRule(ruleConfig.getTables()));
     }
     
     /**
@@ -62,25 +61,5 @@ public final class MaskRule implements DatabaseRule, TableContainedRule {
     public Optional<MaskAlgorithm> findMaskAlgorithm(final String logicTable, final String logicColumn) {
         String lowerCaseLogicTable = logicTable.toLowerCase();
         return tables.containsKey(lowerCaseLogicTable) ? tables.get(lowerCaseLogicTable).findMaskAlgorithmName(logicColumn).map(maskAlgorithms::get) : Optional.empty();
-    }
-    
-    @Override
-    public TableNamesMapper getLogicTableMapper() {
-        return tableNamesMapper;
-    }
-    
-    @Override
-    public TableNamesMapper getActualTableMapper() {
-        return new TableNamesMapper();
-    }
-    
-    @Override
-    public TableNamesMapper getDistributedTableMapper() {
-        return new TableNamesMapper();
-    }
-    
-    @Override
-    public TableNamesMapper getEnhancedTableMapper() {
-        return new TableNamesMapper();
     }
 }

@@ -25,11 +25,11 @@ import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
 import org.apache.shardingsphere.infra.metadata.database.ShardingSphereDatabase;
 import org.apache.shardingsphere.infra.metadata.database.resource.unit.StorageUnit;
 import org.apache.shardingsphere.infra.rule.identifier.scope.GlobalRule;
+import org.apache.shardingsphere.infra.rule.identifier.type.RuleIdentifiers;
 import org.apache.shardingsphere.infra.spi.type.typed.TypedSPILoader;
 import org.apache.shardingsphere.transaction.spi.TransactionHook;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
@@ -52,7 +52,7 @@ public final class GlobalClockRule implements GlobalRule {
     
     private Properties createProperties(final Map<String, ShardingSphereDatabase> databases) {
         Properties result = new Properties();
-        DatabaseType storageType = findStorageType(databases.values()).orElseGet(() -> DatabaseTypeEngine.getStorageType(Collections.emptyList()));
+        DatabaseType storageType = findStorageType(databases.values()).orElseGet(DatabaseTypeEngine::getDefaultStorageType);
         result.setProperty("trunkType", storageType.getTrunkDatabaseType().orElse(storageType).getType());
         result.setProperty("enabled", String.valueOf(configuration.isEnabled()));
         result.setProperty("type", configuration.getType());
@@ -61,7 +61,8 @@ public final class GlobalClockRule implements GlobalRule {
     }
     
     private Optional<DatabaseType> findStorageType(final Collection<ShardingSphereDatabase> databases) {
-        return databases.stream().flatMap(each -> each.getResourceMetaData().getStorageUnitMetaData().getStorageUnits().values().stream()).findFirst().map(StorageUnit::getStorageType);
+        return databases.stream()
+                .flatMap(each -> each.getResourceMetaData().getStorageUnits().values().stream()).findFirst().map(StorageUnit::getStorageType);
     }
     
     /**
@@ -71,5 +72,10 @@ public final class GlobalClockRule implements GlobalRule {
      */
     public String getGlobalClockProviderType() {
         return String.join(".", configuration.getType(), configuration.getProvider());
+    }
+    
+    @Override
+    public RuleIdentifiers getRuleIdentifiers() {
+        return new RuleIdentifiers();
     }
 }

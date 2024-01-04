@@ -109,7 +109,8 @@ import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParser.Wh
 import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParser.WhereOrCurrentClauseContext;
 import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParser.WindowClauseContext;
 import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParser.WindowDefinitionContext;
-import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParser.WindowSpecificationContext;
+import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParser.WindowDefinitionListContext;
+import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParser.IntoClauseContext;
 import org.apache.shardingsphere.sql.parser.autogen.PostgreSQLStatementParserBaseVisitor;
 import org.apache.shardingsphere.sql.parser.sql.common.enums.AggregationType;
 import org.apache.shardingsphere.sql.parser.sql.common.enums.CombineType;
@@ -121,7 +122,6 @@ import org.apache.shardingsphere.sql.parser.sql.common.segment.ddl.constraint.Co
 import org.apache.shardingsphere.sql.parser.sql.common.segment.ddl.index.IndexNameSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.ddl.index.IndexSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.ReturningSegment;
-import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.assignment.AssignmentSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.assignment.ColumnAssignmentSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.assignment.InsertValuesSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.assignment.SetAssignmentSegment;
@@ -172,6 +172,7 @@ import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.DataTypeS
 import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.NameSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.OwnerSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.ParameterMarkerSegment;
+import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.WindowItemSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.WindowSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.table.JoinTableSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.table.SimpleTableSegment;
@@ -413,7 +414,7 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
     
     private ExpressionSegment createSubqueryExpressionSegment(final CExprContext ctx) {
         SubquerySegment subquerySegment = new SubquerySegment(ctx.selectWithParens().getStart().getStartIndex(),
-                ctx.selectWithParens().getStop().getStopIndex(), (PostgreSQLSelectStatement) visit(ctx.selectWithParens()));
+                ctx.selectWithParens().getStop().getStopIndex(), (PostgreSQLSelectStatement) visit(ctx.selectWithParens()), getOriginalText(ctx.selectWithParens()));
         if (null != ctx.EXISTS()) {
             subquerySegment.setSubqueryType(SubqueryType.EXISTS_SUBQUERY);
             return new ExistsSubqueryExpression(ctx.start.getStartIndex(), ctx.stop.getStopIndex(), subquerySegment);
@@ -516,7 +517,7 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
     
     @Override
     public ASTNode visitColumnref(final ColumnrefContext ctx) {
-        if (null != ctx.indirection()) {
+        if (null != ctx.indirection() && null != ctx.indirection().indirectionEl().attrName()) {
             AttrNameContext attrName = ctx.indirection().indirectionEl().attrName();
             ColumnSegment result = new ColumnSegment(ctx.start.getStartIndex(), ctx.stop.getStopIndex(), new IdentifierValue(attrName.getText()));
             OwnerSegment owner = new OwnerSegment(ctx.colId().start.getStartIndex(), ctx.colId().stop.getStopIndex(), new IdentifierValue(ctx.colId().getText()));
@@ -537,7 +538,7 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
     private ExpressionSegment createInExpressionSegment(final InExprContext ctx) {
         if (null != ctx.selectWithParens()) {
             PostgreSQLSelectStatement select = (PostgreSQLSelectStatement) visit(ctx.selectWithParens());
-            SubquerySegment subquerySegment = new SubquerySegment(ctx.start.getStartIndex(), ctx.stop.getStopIndex(), select);
+            SubquerySegment subquerySegment = new SubquerySegment(ctx.start.getStartIndex(), ctx.stop.getStopIndex(), select, getOriginalText(ctx.selectWithParens()));
             return new SubqueryExpressionSegment(subquerySegment);
         }
         ListExpression result = new ListExpression(ctx.LP_().getSymbol().getStartIndex(), ctx.RP_().getSymbol().getStopIndex());
@@ -708,7 +709,7 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
     @Override
     public ASTNode visitOptOnConflict(final OptOnConflictContext ctx) {
         SetClauseListContext setClauseListContext = ctx.setClauseList();
-        Collection<AssignmentSegment> assignments = ((SetAssignmentSegment) visit(setClauseListContext)).getAssignments();
+        Collection<ColumnAssignmentSegment> assignments = ((SetAssignmentSegment) visit(setClauseListContext)).getAssignments();
         return new OnDuplicateKeyColumnsSegment(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), assignments);
     }
     
@@ -759,7 +760,7 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
         ValuesClauseContext valuesClause = ctx.select().selectNoParens().selectClauseN().simpleSelect().valuesClause();
         if (null == valuesClause) {
             PostgreSQLSelectStatement selectStatement = (PostgreSQLSelectStatement) visit(ctx.select());
-            result.setInsertSelect(new SubquerySegment(ctx.select().start.getStartIndex(), ctx.select().stop.getStopIndex(), selectStatement));
+            result.setInsertSelect(new SubquerySegment(ctx.select().start.getStartIndex(), ctx.select().stop.getStopIndex(), selectStatement, getOriginalText(ctx.select())));
         } else {
             result.getValues().addAll(createInsertValuesSegments(valuesClause));
         }
@@ -818,13 +819,13 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
         return result;
     }
     
-    private Collection<AssignmentSegment> generateAssignmentSegments(final SetClauseListContext ctx) {
-        Collection<AssignmentSegment> result = new LinkedList<>();
+    private Collection<ColumnAssignmentSegment> generateAssignmentSegments(final SetClauseListContext ctx) {
+        Collection<ColumnAssignmentSegment> result = new LinkedList<>();
         if (null != ctx.setClauseList()) {
-            Collection<AssignmentSegment> tmpResult = generateAssignmentSegments(ctx.setClauseList());
+            Collection<ColumnAssignmentSegment> tmpResult = generateAssignmentSegments(ctx.setClauseList());
             result.addAll(tmpResult);
         }
-        AssignmentSegment assignmentSegment = (AssignmentSegment) visit(ctx.setClause());
+        ColumnAssignmentSegment assignmentSegment = (ColumnAssignmentSegment) visit(ctx.setClause());
         result.add(assignmentSegment);
         return result;
     }
@@ -868,7 +869,7 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
     
     @Override
     public ASTNode visitSetClauseList(final SetClauseListContext ctx) {
-        Collection<AssignmentSegment> assignments = generateAssignmentSegments(ctx);
+        Collection<ColumnAssignmentSegment> assignments = generateAssignmentSegments(ctx);
         return new SetAssignmentSegment(ctx.start.getStartIndex() - 4, ctx.stop.getStopIndex(), assignments);
     }
     
@@ -969,6 +970,9 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
             }
             result.setProjections(projects);
         }
+        if (null != ctx.intoClause()) {
+            result.setIntoSegment((TableSegment) visit(ctx.intoClause()));
+        }
         if (null != ctx.fromClause()) {
             TableSegment tableSegment = (TableSegment) visit(ctx.fromClause());
             result.setFrom(tableSegment);
@@ -989,6 +993,11 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
     }
     
     @Override
+    public ASTNode visitIntoClause(final IntoClauseContext ctx) {
+        return visit(ctx.optTempTableName().qualifiedName());
+    }
+    
+    @Override
     public ASTNode visitHavingClause(final HavingClauseContext ctx) {
         ExpressionSegment expr = (ExpressionSegment) visit(ctx.aExpr());
         return new HavingSegment(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), expr);
@@ -996,19 +1005,38 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
     
     @Override
     public ASTNode visitWindowClause(final WindowClauseContext ctx) {
+        WindowSegment result = new WindowSegment(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex());
+        appendWindowItems(ctx.windowDefinitionList(), result.getItemSegments());
+        return result;
+    }
+    
+    private void appendWindowItems(final WindowDefinitionListContext ctx, final Collection<WindowItemSegment> windowItems) {
         if (null != ctx.windowDefinitionList()) {
-            return new WindowSegment(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex(), getWindowItem(ctx.windowDefinitionList().windowDefinition()),
-                    getWindowSpecification(ctx.windowDefinitionList().windowDefinition().windowSpecification()));
+            appendWindowItems(ctx.windowDefinitionList(), windowItems);
+            windowItems.add((WindowItemSegment) visit(ctx.windowDefinition()));
+            return;
         }
-        return new WindowSegment(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex());
+        windowItems.add((WindowItemSegment) visit(ctx.windowDefinition()));
     }
     
-    private IdentifierValue getWindowItem(final WindowDefinitionContext ctx) {
-        return new IdentifierValue(ctx.colId().identifier().getText());
-    }
-    
-    private Collection<ExpressionSegment> getWindowSpecification(final WindowSpecificationContext ctx) {
-        return createInsertValuesSegments(ctx.partitionClause().exprList());
+    @SuppressWarnings("unchecked")
+    @Override
+    public ASTNode visitWindowDefinition(final WindowDefinitionContext ctx) {
+        WindowItemSegment result = new WindowItemSegment(ctx.getStart().getStartIndex(), ctx.getStop().getStopIndex());
+        result.setWindowName(new IdentifierValue(ctx.colId().getText()));
+        if (null != ctx.windowSpecification().partitionClause()) {
+            CollectionValue<ExpressionSegment> value = (CollectionValue<ExpressionSegment>) visit(ctx.windowSpecification().partitionClause().exprList());
+            result.setPartitionListSegments(value.getValue());
+        }
+        if (null != ctx.windowSpecification().sortClause()) {
+            OrderBySegment orderBySegment = (OrderBySegment) visit(ctx.windowSpecification().sortClause());
+            result.setOrderBySegment(orderBySegment);
+        }
+        if (null != ctx.windowSpecification().frameClause()) {
+            result.setFrameClause(new CommonExpressionSegment(ctx.windowSpecification().frameClause().start.getStartIndex(), ctx.windowSpecification().frameClause().stop.getStopIndex(),
+                    ctx.windowSpecification().frameClause().getText()));
+        }
+        return result;
     }
     
     @Override
@@ -1127,7 +1155,7 @@ public abstract class PostgreSQLStatementVisitor extends PostgreSQLStatementPars
         }
         if (null != ctx.selectWithParens()) {
             PostgreSQLSelectStatement select = (PostgreSQLSelectStatement) visit(ctx.selectWithParens());
-            SubquerySegment subquery = new SubquerySegment(ctx.selectWithParens().start.getStartIndex(), ctx.selectWithParens().stop.getStopIndex(), select);
+            SubquerySegment subquery = new SubquerySegment(ctx.selectWithParens().start.getStartIndex(), ctx.selectWithParens().stop.getStopIndex(), select, getOriginalText(ctx.selectWithParens()));
             AliasSegment alias = null == ctx.aliasClause() ? null : (AliasSegment) visit(ctx.aliasClause());
             SubqueryTableSegment result = new SubqueryTableSegment(subquery);
             result.setAlias(alias);

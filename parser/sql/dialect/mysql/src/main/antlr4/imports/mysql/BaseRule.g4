@@ -17,7 +17,7 @@
 
 grammar BaseRule;
 
-import Symbol, Keyword, MySQLKeyword, Literals;
+import Comments, Symbol, Keyword, MySQLKeyword, Literals;
 
 parameterMarker
     : QUESTION_
@@ -918,7 +918,7 @@ simpleExpr
     | columnRef
     | simpleExpr collateClause
     | variable
-    | simpleExpr OR_ simpleExpr
+    | simpleExpr VERTICAL_BAR_ VERTICAL_BAR_ simpleExpr
     | (PLUS_ | MINUS_ | TILDE_ | notOperator | BINARY) simpleExpr
     | ROW? LP_ expr (COMMA_ expr)* RP_
     | EXISTS? subquery
@@ -1017,6 +1017,7 @@ specialFunction
     | weightStringFunction
     | windowFunction
     | groupingFunction
+    | timeStampDiffFunction
     ;
     
 currentUserFunction
@@ -1025,6 +1026,10 @@ currentUserFunction
     
 groupingFunction
     : GROUPING LP_ expr (COMMA_ expr)* RP_
+    ;
+
+timeStampDiffFunction
+    : TIMESTAMPDIFF LP_ intervalUnit COMMA_ expr COMMA_ expr RP_
     ;
 
 groupConcatFunction

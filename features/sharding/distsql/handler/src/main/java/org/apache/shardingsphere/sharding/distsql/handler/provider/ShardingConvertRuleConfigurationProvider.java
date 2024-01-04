@@ -18,8 +18,8 @@
 package org.apache.shardingsphere.sharding.distsql.handler.provider;
 
 import com.google.common.base.Strings;
-import org.apache.shardingsphere.distsql.handler.ral.query.ConvertRuleConfigurationProvider;
-import org.apache.shardingsphere.infra.config.algorithm.AlgorithmConfiguration;
+import org.apache.shardingsphere.distsql.handler.engine.query.ral.convert.ConvertRuleConfigurationProvider;
+import org.apache.shardingsphere.infra.algorithm.core.config.AlgorithmConfiguration;
 import org.apache.shardingsphere.infra.config.rule.RuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.ShardingRuleConfiguration;
 import org.apache.shardingsphere.sharding.api.config.rule.ShardingAutoTableRuleConfiguration;
@@ -60,7 +60,7 @@ public final class ShardingConvertRuleConfigurationProvider implements ConvertRu
         String autoTableRules = getAutoTableRules(ruleConfig);
         stringBuilder.append(ShardingDistSQLConstants.CREATE_SHARDING_TABLE).append(tableRules);
         if (!Strings.isNullOrEmpty(tableRules) && !Strings.isNullOrEmpty(autoTableRules)) {
-            stringBuilder.append(ShardingDistSQLConstants.COMMA).append(System.lineSeparator());
+            stringBuilder.append(ShardingDistSQLConstants.COMMA);
         }
         stringBuilder.append(autoTableRules).append(ShardingDistSQLConstants.SEMI).append(System.lineSeparator()).append(System.lineSeparator());
     }

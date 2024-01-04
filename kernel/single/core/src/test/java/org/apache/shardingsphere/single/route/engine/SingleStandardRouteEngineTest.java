@@ -17,6 +17,7 @@
 
 package org.apache.shardingsphere.single.route.engine;
 
+import org.apache.shardingsphere.infra.database.mysql.type.MySQLDatabaseType;
 import org.apache.shardingsphere.infra.exception.dialect.exception.syntax.table.TableExistsException;
 import org.apache.shardingsphere.infra.database.core.DefaultDatabase;
 import org.apache.shardingsphere.infra.datanode.DataNode;
@@ -24,6 +25,7 @@ import org.apache.shardingsphere.infra.metadata.database.schema.QualifiedTable;
 import org.apache.shardingsphere.infra.route.context.RouteContext;
 import org.apache.shardingsphere.infra.route.context.RouteMapper;
 import org.apache.shardingsphere.infra.route.context.RouteUnit;
+import org.apache.shardingsphere.infra.rule.identifier.type.datanode.DataNodeRule;
 import org.apache.shardingsphere.single.api.config.SingleRuleConfiguration;
 import org.apache.shardingsphere.single.rule.SingleRule;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.table.SimpleTableSegment;
@@ -60,9 +62,9 @@ class SingleStandardRouteEngineTest {
     @Test
     void assertRouteInSameDataSource() throws SQLException {
         SingleStandardRouteEngine engine = new SingleStandardRouteEngine(mockQualifiedTables(), null);
-        SingleRule singleRule = new SingleRule(new SingleRuleConfiguration(), DefaultDatabase.LOGIC_NAME, createDataSourceMap(), Collections.emptyList());
-        singleRule.getSingleTableDataNodes().put("t_order", Collections.singleton(mockDataNode("t_order")));
-        singleRule.getSingleTableDataNodes().put("t_order_item", Collections.singleton(mockDataNode("t_order_item")));
+        SingleRule singleRule = new SingleRule(new SingleRuleConfiguration(), DefaultDatabase.LOGIC_NAME, new MySQLDatabaseType(), createDataSourceMap(), Collections.emptyList());
+        singleRule.getRuleIdentifiers().getIdentifier(DataNodeRule.class).getAllDataNodes().put("t_order", Collections.singleton(mockDataNode("t_order")));
+        singleRule.getRuleIdentifiers().getIdentifier(DataNodeRule.class).getAllDataNodes().put("t_order_item", Collections.singleton(mockDataNode("t_order_item")));
         RouteContext routeContext = new RouteContext();
         engine.route(routeContext, singleRule);
         List<RouteUnit> routeUnits = new ArrayList<>(routeContext.getRouteUnits());
@@ -91,7 +93,7 @@ class SingleStandardRouteEngineTest {
     @Test
     void assertRouteWithoutSingleRule() throws SQLException {
         SingleStandardRouteEngine engine = new SingleStandardRouteEngine(mockQualifiedTables(), new MySQLCreateTableStatement(false));
-        SingleRule singleRule = new SingleRule(new SingleRuleConfiguration(), DefaultDatabase.LOGIC_NAME, createDataSourceMap(), Collections.emptyList());
+        SingleRule singleRule = new SingleRule(new SingleRuleConfiguration(), DefaultDatabase.LOGIC_NAME, new MySQLDatabaseType(), createDataSourceMap(), Collections.emptyList());
         RouteContext routeContext = new RouteContext();
         engine.route(routeContext, singleRule);
         List<RouteUnit> routeUnits = new ArrayList<>(routeContext.getRouteUnits());
@@ -106,7 +108,8 @@ class SingleStandardRouteEngineTest {
     @Test
     void assertRouteWithDefaultSingleRule() throws SQLException {
         SingleStandardRouteEngine engine = new SingleStandardRouteEngine(mockQualifiedTables(), new MySQLCreateTableStatement(false));
-        SingleRule singleRule = new SingleRule(new SingleRuleConfiguration(Collections.emptyList(), "ds_0"), DefaultDatabase.LOGIC_NAME, createDataSourceMap(), Collections.emptyList());
+        SingleRule singleRule =
+                new SingleRule(new SingleRuleConfiguration(Collections.emptyList(), "ds_0"), DefaultDatabase.LOGIC_NAME, new MySQLDatabaseType(), createDataSourceMap(), Collections.emptyList());
         RouteContext routeContext = new RouteContext();
         engine.route(routeContext, singleRule);
         List<RouteUnit> routeUnits = new ArrayList<>(routeContext.getRouteUnits());

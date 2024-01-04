@@ -29,7 +29,6 @@ import org.apache.shardingsphere.infra.metadata.ShardingSphereMetaData;
 import org.apache.shardingsphere.infra.metadata.database.ShardingSphereDatabase;
 import org.apache.shardingsphere.infra.metadata.database.resource.ResourceMetaData;
 import org.apache.shardingsphere.infra.metadata.database.rule.RuleMetaData;
-import org.apache.shardingsphere.infra.rule.identifier.type.TableContainedRule;
 import org.apache.shardingsphere.sql.parser.sql.common.enums.OrderDirection;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.column.ColumnSegment;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.expr.subquery.SubquerySegment;
@@ -233,7 +232,7 @@ class ProjectionsContextEngineTest {
     
     private ShardingSphereDatabase mockDatabase() {
         ShardingSphereDatabase result = mock(ShardingSphereDatabase.class, RETURNS_DEEP_STUBS);
-        when(result.getRuleMetaData().findRules(TableContainedRule.class)).thenReturn(Collections.emptyList());
+        when(result.getRuleMetaData().getRules()).thenReturn(Collections.emptyList());
         return result;
     }
     
@@ -400,7 +399,7 @@ class ProjectionsContextEngineTest {
         projectionsSegment.getProjections().add(projectionSegment);
         selectStatement.setProjections(projectionsSegment);
         subquerySelectStatement.setProjections(new ProjectionsSegment(0, 0));
-        SubqueryTableSegment subqueryTableSegment = new SubqueryTableSegment(new SubquerySegment(0, 0, subquerySelectStatement));
+        SubqueryTableSegment subqueryTableSegment = new SubqueryTableSegment(new SubquerySegment(0, 0, subquerySelectStatement, ""));
         subqueryTableSegment.setAlias(new AliasSegment(0, 0, new IdentifierValue("d")));
         selectStatement.setFrom(subqueryTableSegment);
         ColumnSegment columnSegment = new ColumnSegment(0, 0, new IdentifierValue("name"));
@@ -445,7 +444,7 @@ class ProjectionsContextEngineTest {
         projectionsSegment.getProjections().add(projectionSegment);
         selectStatement.setProjections(projectionsSegment);
         subquerySelectStatement.setProjections(new ProjectionsSegment(0, 0));
-        SubqueryTableSegment subqueryTableSegment = new SubqueryTableSegment(new SubquerySegment(0, 0, subquerySelectStatement));
+        SubqueryTableSegment subqueryTableSegment = new SubqueryTableSegment(new SubquerySegment(0, 0, subquerySelectStatement, ""));
         subqueryTableSegment.setAlias(new AliasSegment(0, 0, new IdentifierValue("TABLE")));
         selectStatement.setFrom(subqueryTableSegment);
         ColumnSegment columnSegment = new ColumnSegment(0, 0, new IdentifierValue("name"));

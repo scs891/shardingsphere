@@ -19,15 +19,14 @@ package org.apache.shardingsphere.proxy.backend.handler.distsql.ral.queryable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-import org.apache.shardingsphere.distsql.handler.ral.constant.DistSQLScriptConstants;
-import org.apache.shardingsphere.distsql.handler.ral.query.ConvertRuleConfigurationProvider;
-import org.apache.shardingsphere.distsql.handler.ral.query.QueryableRALExecutor;
-import org.apache.shardingsphere.distsql.parser.statement.ral.queryable.ConvertYamlConfigurationStatement;
-import org.apache.shardingsphere.encrypt.api.config.CompatibleEncryptRuleConfiguration;
+import org.apache.shardingsphere.distsql.handler.engine.query.DistSQLQueryExecutor;
+import org.apache.shardingsphere.distsql.handler.engine.query.ral.convert.DistSQLScriptConstants;
+import org.apache.shardingsphere.distsql.handler.engine.query.ral.convert.ConvertRuleConfigurationProvider;
+import org.apache.shardingsphere.distsql.statement.ral.queryable.convert.ConvertYamlConfigurationStatement;
 import org.apache.shardingsphere.infra.config.rule.RuleConfiguration;
 import org.apache.shardingsphere.infra.datasource.pool.config.DataSourceConfiguration;
-import org.apache.shardingsphere.infra.datasource.pool.props.domain.DataSourcePoolProperties;
 import org.apache.shardingsphere.infra.datasource.pool.props.creator.DataSourcePoolPropertiesCreator;
+import org.apache.shardingsphere.infra.datasource.pool.props.domain.DataSourcePoolProperties;
 import org.apache.shardingsphere.infra.datasource.pool.props.domain.custom.CustomDataSourcePoolProperties;
 import org.apache.shardingsphere.infra.datasource.pool.props.domain.synonym.PoolPropertySynonyms;
 import org.apache.shardingsphere.infra.merge.result.impl.local.LocalDataQueryResultRow;
@@ -36,6 +35,7 @@ import org.apache.shardingsphere.infra.spi.type.typed.TypedSPILoader;
 import org.apache.shardingsphere.infra.util.yaml.YamlEngine;
 import org.apache.shardingsphere.infra.yaml.config.pojo.rule.YamlRuleConfiguration;
 import org.apache.shardingsphere.infra.yaml.config.swapper.rule.YamlRuleConfigurationSwapper;
+import org.apache.shardingsphere.mode.manager.ContextManager;
 import org.apache.shardingsphere.proxy.backend.config.yaml.YamlProxyDataSourceConfiguration;
 import org.apache.shardingsphere.proxy.backend.config.yaml.YamlProxyDatabaseConfiguration;
 import org.apache.shardingsphere.proxy.backend.config.yaml.swapper.YamlProxyDataSourceConfigurationSwapper;
@@ -54,23 +54,23 @@ import java.util.TreeMap;
 /**
  * Convert YAML configuration executor.
  */
-public final class ConvertYamlConfigurationExecutor implements QueryableRALExecutor<ConvertYamlConfigurationStatement> {
+public final class ConvertYamlConfigurationExecutor implements DistSQLQueryExecutor<ConvertYamlConfigurationStatement> {
     
     private final YamlProxyDataSourceConfigurationSwapper dataSourceConfigSwapper = new YamlProxyDataSourceConfigurationSwapper();
     
     @Override
-    public Collection<String> getColumnNames() {
+    public Collection<String> getColumnNames(final ConvertYamlConfigurationStatement statement) {
         return Collections.singleton("dist_sql");
     }
     
     @Override
-    public Collection<LocalDataQueryResultRow> getRows(final ConvertYamlConfigurationStatement sqlStatement) {
+    public Collection<LocalDataQueryResultRow> getRows(final ConvertYamlConfigurationStatement sqlStatement, final ContextManager contextManager) {
         File file = new File(sqlStatement.getFilePath());
         YamlProxyDatabaseConfiguration yamlConfig;
         try {
             yamlConfig = YamlEngine.unmarshal(file, YamlProxyDatabaseConfiguration.class);
-        } catch (final IOException ex) {
-            throw new FileIOException(ex);
+        } catch (final IOException ignore) {
+            throw new FileIOException(file);
         }
         Preconditions.checkNotNull(yamlConfig, "Invalid yaml file `%s`", file.getName());
         Preconditions.checkNotNull(yamlConfig.getDatabaseName(), "`databaseName` in file `%s` is required.", file.getName());
@@ -82,9 +82,6 @@ public final class ConvertYamlConfigurationExecutor implements QueryableRALExecu
         appendResourceDistSQL(yamlConfig, result);
         for (RuleConfiguration each : swapToRuleConfigs(yamlConfig).values()) {
             Class<? extends RuleConfiguration> type = each.getClass();
-            if (each instanceof CompatibleEncryptRuleConfiguration) {
-                type = ((CompatibleEncryptRuleConfiguration) each).convertToEncryptRuleConfiguration().getClass();
-            }
             ConvertRuleConfigurationProvider convertRuleConfigProvider = TypedSPILoader.getService(ConvertRuleConfigurationProvider.class, type);
             result.append(convertRuleConfigProvider.convert(each));
         }

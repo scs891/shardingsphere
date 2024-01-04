@@ -17,16 +17,19 @@
 
 package org.apache.shardingsphere.readwritesplitting.checker;
 
-import org.apache.shardingsphere.infra.config.algorithm.AlgorithmConfiguration;
+import org.apache.shardingsphere.infra.algorithm.core.config.AlgorithmConfiguration;
 import org.apache.shardingsphere.infra.config.rule.checker.RuleConfigurationChecker;
-import org.apache.shardingsphere.infra.rule.identifier.type.DataSourceContainedRule;
+import org.apache.shardingsphere.infra.rule.ShardingSphereRule;
+import org.apache.shardingsphere.infra.rule.identifier.type.RuleIdentifiers;
+import org.apache.shardingsphere.infra.rule.identifier.type.datasource.DataSourceMapperRule;
 import org.apache.shardingsphere.infra.spi.type.ordered.OrderedSPILoader;
 import org.apache.shardingsphere.readwritesplitting.api.ReadwriteSplittingRuleConfiguration;
 import org.apache.shardingsphere.readwritesplitting.api.rule.ReadwriteSplittingDataSourceRuleConfiguration;
-import org.apache.shardingsphere.readwritesplitting.exception.checker.DataSourceNameExistedException;
+import org.apache.shardingsphere.readwritesplitting.exception.checker.DataSourceNameNotExistedException;
 import org.apache.shardingsphere.readwritesplitting.exception.checker.DuplicateDataSourceException;
 import org.apache.shardingsphere.readwritesplitting.exception.checker.InvalidWeightLoadBalancerConfigurationException;
 import org.apache.shardingsphere.readwritesplitting.exception.checker.MissingRequiredWriteDataSourceNameException;
+import org.apache.shardingsphere.test.fixture.jdbc.MockedDataSource;
 import org.apache.shardingsphere.test.util.PropertiesBuilder;
 import org.apache.shardingsphere.test.util.PropertiesBuilder.Property;
 import org.junit.jupiter.api.Test;
@@ -70,7 +73,7 @@ class ReadwriteSplittingRuleConfigurationCheckerTest {
                 "write_ds_0", Arrays.asList("read_ds_0", "read_ds_1")), createDataSourceRuleConfig("write_ds_2", Arrays.asList("read_ds_0", "read_ds_1")));
         when(config.getDataSources()).thenReturn(configs);
         RuleConfigurationChecker checker = OrderedSPILoader.getServicesByClass(RuleConfigurationChecker.class, Collections.singleton(config.getClass())).get(config.getClass());
-        assertThrows(DataSourceNameExistedException.class, () -> checker.check("test", config, mockDataSources(), Collections.emptyList()));
+        assertThrows(DataSourceNameNotExistedException.class, () -> checker.check("test", config, mockDataSources(), Collections.emptyList()));
     }
     
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -101,9 +104,11 @@ class ReadwriteSplittingRuleConfigurationCheckerTest {
     void assertCheckWhenConfigOtherRulesDatasource() {
         ReadwriteSplittingRuleConfiguration config = createContainsOtherRulesDatasourceConfig();
         RuleConfigurationChecker checker = OrderedSPILoader.getServicesByClass(RuleConfigurationChecker.class, Collections.singleton(config.getClass())).get(config.getClass());
-        DataSourceContainedRule dataSourceContainedRule = mock(DataSourceContainedRule.class, RETURNS_DEEP_STUBS);
-        when(dataSourceContainedRule.getDataSourceMapper().containsKey("otherDatasourceName")).thenReturn(true);
-        checker.check("test", config, mockDataSources(), Collections.singleton(dataSourceContainedRule));
+        ShardingSphereRule rule = mock(ShardingSphereRule.class);
+        DataSourceMapperRule dataSourceMapperRule = mock(DataSourceMapperRule.class, RETURNS_DEEP_STUBS);
+        when(dataSourceMapperRule.getDataSourceMapper().containsKey("otherDatasourceName")).thenReturn(true);
+        when(rule.getRuleIdentifiers()).thenReturn(new RuleIdentifiers(dataSourceMapperRule));
+        checker.check("test", config, mockDataSources(), Collections.singleton(rule));
     }
     
     private ReadwriteSplittingRuleConfiguration createContainsOtherRulesDatasourceConfig() {
@@ -127,10 +132,10 @@ class ReadwriteSplittingRuleConfigurationCheckerTest {
     
     private Map<String, DataSource> mockDataSources() {
         Map<String, DataSource> result = new LinkedHashMap<>(2, 1F);
-        result.put("read_ds_0", mock(DataSource.class));
-        result.put("read_ds_1", mock(DataSource.class));
-        result.put("write_ds_0", mock(DataSource.class));
-        result.put("write_ds_1", mock(DataSource.class));
+        result.put("read_ds_0", new MockedDataSource());
+        result.put("read_ds_1", new MockedDataSource());
+        result.put("write_ds_0", new MockedDataSource());
+        result.put("write_ds_1", new MockedDataSource());
         return result;
     }
 }

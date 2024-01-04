@@ -85,6 +85,21 @@ class MySQLMultiStatementsHandlerTest {
         assertThat(actualHeader.getSqlStatement(), is(expectedStatement));
     }
     
+    @Test
+    void assertExecuteWithSpecifiedDatabaseName() throws SQLException {
+        String sql = "update foo_db.t set v=v+1 where id=1;update foo_db.t set v=v+1 where id=2;update foo_db.t set v=v+1 where id=3";
+        ConnectionSession connectionSession = mockConnectionSession();
+        MySQLUpdateStatement expectedStatement = mock(MySQLUpdateStatement.class);
+        ContextManager contextManager = mockContextManager();
+        when(ProxyContext.getInstance().getContextManager()).thenReturn(contextManager);
+        ResponseHeader actual = new MySQLMultiStatementsHandler(connectionSession, expectedStatement, sql).execute();
+        assertThat(actual, instanceOf(UpdateResponseHeader.class));
+        UpdateResponseHeader actualHeader = (UpdateResponseHeader) actual;
+        assertThat(actualHeader.getUpdateCount(), is(3L));
+        assertThat(actualHeader.getLastInsertId(), is(0L));
+        assertThat(actualHeader.getSqlStatement(), is(expectedStatement));
+    }
+    
     private ConnectionSession mockConnectionSession() throws SQLException {
         ConnectionSession result = mock(ConnectionSession.class, RETURNS_DEEP_STUBS);
         when(result.getDatabaseName()).thenReturn("foo_db");
@@ -104,11 +119,10 @@ class MySQLMultiStatementsHandlerTest {
     
     private ContextManager mockContextManager() {
         ContextManager result = mock(ContextManager.class, RETURNS_DEEP_STUBS);
-        when(result.getMetaDataContexts().getMetaData().getDatabase("foo_db").getResourceMetaData().getAllInstanceDataSourceNames())
-                .thenReturn(Collections.singletonList("foo_ds"));
-        StorageUnit storageUnit = mock(StorageUnit.class);
+        when(result.getMetaDataContexts().getMetaData().getDatabase("foo_db").getResourceMetaData().getAllInstanceDataSourceNames()).thenReturn(Collections.singletonList("foo_ds"));
+        StorageUnit storageUnit = mock(StorageUnit.class, RETURNS_DEEP_STUBS);
         when(storageUnit.getStorageType()).thenReturn(TypedSPILoader.getService(DatabaseType.class, "FIXTURE"));
-        when(result.getMetaDataContexts().getMetaData().getDatabase("foo_db").getResourceMetaData().getStorageUnitMetaData().getStorageUnits())
+        when(result.getMetaDataContexts().getMetaData().getDatabase("foo_db").getResourceMetaData().getStorageUnits())
                 .thenReturn(Collections.singletonMap("foo_ds", storageUnit));
         when(result.getMetaDataContexts().getMetaData().getDatabase("foo_db").getProtocolType()).thenReturn(TypedSPILoader.getService(DatabaseType.class, "MySQL"));
         when(result.getMetaDataContexts().getMetaData().getDatabase("foo_db").getRuleMetaData())

@@ -18,9 +18,11 @@
 package org.apache.shardingsphere.encrypt.algorithm.assisted;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.apache.shardingsphere.encrypt.api.context.EncryptContext;
-import org.apache.shardingsphere.encrypt.api.encrypt.assisted.AssistedEncryptAlgorithm;
+import org.apache.shardingsphere.encrypt.spi.EncryptAlgorithm;
+import org.apache.shardingsphere.encrypt.spi.EncryptAlgorithmMetaData;
+import org.apache.shardingsphere.infra.algorithm.core.context.AlgorithmSQLContext;
 
 import java.util.Properties;
 
@@ -28,20 +30,32 @@ import java.util.Properties;
  * MD5 assisted encrypt algorithm.
  */
 @EqualsAndHashCode
-public final class MD5AssistedEncryptAlgorithm implements AssistedEncryptAlgorithm {
+public final class MD5AssistedEncryptAlgorithm implements EncryptAlgorithm {
     
     private static final String SALT_KEY = "salt";
+    
+    @Getter
+    private final EncryptAlgorithmMetaData metaData = new EncryptAlgorithmMetaData(false, true, false);
     
     private String salt;
     
     @Override
     public void init(final Properties props) {
-        this.salt = props.getProperty(SALT_KEY, "");
+        salt = getSalt(props);
+    }
+    
+    private String getSalt(final Properties props) {
+        return props.getProperty(SALT_KEY, "");
     }
     
     @Override
-    public String encrypt(final Object plainValue, final EncryptContext encryptContext) {
+    public String encrypt(final Object plainValue, final AlgorithmSQLContext algorithmSQLContext) {
         return null == plainValue ? null : DigestUtils.md5Hex(plainValue + salt);
+    }
+    
+    @Override
+    public Object decrypt(final Object cipherValue, final AlgorithmSQLContext algorithmSQLContext) {
+        throw new UnsupportedOperationException(String.format("Algorithm `%s` is unsupported to decrypt", getType()));
     }
     
     @Override

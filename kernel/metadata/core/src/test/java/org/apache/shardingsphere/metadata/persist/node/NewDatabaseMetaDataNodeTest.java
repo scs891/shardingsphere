@@ -80,7 +80,7 @@ class NewDatabaseMetaDataNodeTest {
     
     @Test
     void assertGetTableName() {
-        Optional<String> actual = NewDatabaseMetaDataNode.getTableName("/metadata/foo_db/schemas/foo_schema/tables/foo_table/versions/0");
+        Optional<String> actual = NewDatabaseMetaDataNode.getTableName("/metadata/foo_db/schemas/foo_schema/tables/foo_table/active_version");
         assertTrue(actual.isPresent());
         assertThat(actual.get(), is("foo_table"));
     }
@@ -186,5 +186,10 @@ class NewDatabaseMetaDataNodeTest {
     @Test
     void assertGetViewNode() {
         assertThat(NewDatabaseMetaDataNode.getViewNode("foo_db", "foo_schema", "foo_view"), is("/metadata/foo_db/schemas/foo_schema/views/foo_view"));
+    }
+    
+    @Test
+    void assertGetDataSourceNodeVersionsNode() {
+        assertThat(NewDatabaseMetaDataNode.getDataSourceNodeVersionsNode("foo_db", "foo_ds"), is("/metadata/foo_db/data_sources/nodes/foo_ds/versions"));
     }
 }
