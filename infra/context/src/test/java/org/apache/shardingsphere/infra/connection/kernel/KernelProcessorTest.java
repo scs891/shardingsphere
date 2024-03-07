@@ -24,13 +24,14 @@ import org.apache.shardingsphere.infra.config.props.ConfigurationPropertyKey;
 import org.apache.shardingsphere.infra.database.core.DefaultDatabase;
 import org.apache.shardingsphere.infra.database.core.type.DatabaseType;
 import org.apache.shardingsphere.infra.executor.sql.context.ExecutionContext;
+import org.apache.shardingsphere.infra.hint.HintValueContext;
 import org.apache.shardingsphere.infra.metadata.database.ShardingSphereDatabase;
 import org.apache.shardingsphere.infra.metadata.database.resource.ResourceMetaData;
 import org.apache.shardingsphere.infra.metadata.database.rule.RuleMetaData;
 import org.apache.shardingsphere.infra.rule.ShardingSphereRule;
 import org.apache.shardingsphere.infra.session.connection.ConnectionContext;
 import org.apache.shardingsphere.infra.session.query.QueryContext;
-import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.SelectStatement;
+import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.GenericSelectStatement;
 import org.apache.shardingsphere.sqltranslator.context.SQLTranslatorContext;
 import org.apache.shardingsphere.sqltranslator.rule.SQLTranslatorRule;
 import org.apache.shardingsphere.test.util.PropertiesBuilder;
@@ -53,8 +54,8 @@ class KernelProcessorTest {
     @Test
     void assertGenerateExecutionContext() {
         SQLStatementContext sqlStatementContext = mock(CommonSQLStatementContext.class);
-        when(sqlStatementContext.getSqlStatement()).thenReturn(mock(SelectStatement.class));
-        QueryContext queryContext = new QueryContext(sqlStatementContext, "SELECT * FROM tbl", Collections.emptyList());
+        when(sqlStatementContext.getSqlStatement()).thenReturn(mock(GenericSelectStatement.class));
+        QueryContext queryContext = new QueryContext(sqlStatementContext, "SELECT * FROM tbl", Collections.emptyList(), new HintValueContext());
         ResourceMetaData resourceMetaData = mock(ResourceMetaData.class, RETURNS_DEEP_STUBS);
         when(resourceMetaData.getStorageUnits()).thenReturn(Collections.emptyMap());
         ShardingSphereDatabase database = new ShardingSphereDatabase(DefaultDatabase.LOGIC_NAME, mock(DatabaseType.class),

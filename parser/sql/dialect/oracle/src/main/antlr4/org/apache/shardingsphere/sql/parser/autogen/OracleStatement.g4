@@ -19,6 +19,7 @@ grammar OracleStatement;
 
 import DMLStatement, DCLStatement, DDLStatement, TCLStatement, DALStatement, PLSQL;
 
+
 execute
     : (select
     | insert
@@ -161,5 +162,6 @@ execute
     | createProfile
     | createTrigger
     | show
+    | spool
     ) SEMI_? SLASH_? EOF
     ;

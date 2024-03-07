@@ -15,11 +15,28 @@
  * limitations under the License.
  */
 
+<<<<<<< HEAD:test/it/parser/src/main/java/org/apache/shardingsphere/test/it/sql/parser/internal/cases/parser/jaxb/segment/impl/hint/ExpectedTableHint.java
+package org.apache.shardingsphere.test.it.sql.parser.internal.cases.parser.jaxb.segment.impl.hint;
+=======
 package org.apache.shardingsphere.test.it.sql.parser.internal.cases.parser.jaxb.segment.impl.plsql;
+>>>>>>> @{-1}:test/it/parser/src/main/java/org/apache/shardingsphere/test/it/sql/parser/internal/cases/parser/jaxb/segment/impl/plsql/ExpectedRoutineName.java
 
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.shardingsphere.test.it.sql.parser.internal.cases.parser.jaxb.segment.AbstractExpectedSQLSegment;
+<<<<<<< HEAD:test/it/parser/src/main/java/org/apache/shardingsphere/test/it/sql/parser/internal/cases/parser/jaxb/segment/impl/hint/ExpectedTableHint.java
+import javax.xml.bind.annotation.XmlAttribute;
+
+/**
+ * Expected table hint.
+ **/
+@Getter
+@Setter
+public final class ExpectedTableHint extends AbstractExpectedSQLSegment {
+    
+    @XmlAttribute
+    private String value;
+=======
 
 import javax.xml.bind.annotation.XmlAttribute;
 
@@ -32,4 +49,5 @@ public final class ExpectedRoutineName extends AbstractExpectedSQLSegment {
     
     @XmlAttribute
     private String name;
+>>>>>>> @{-1}:test/it/parser/src/main/java/org/apache/shardingsphere/test/it/sql/parser/internal/cases/parser/jaxb/segment/impl/plsql/ExpectedRoutineName.java
 }

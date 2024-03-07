@@ -19,19 +19,21 @@ package org.apache.shardingsphere.proxy.backend.mysql.handler.admin.executor;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import org.apache.shardingsphere.infra.exception.dialect.exception.syntax.database.NoDatabaseSelectedException;
-import org.apache.shardingsphere.infra.binder.engine.SQLBindEngine;
 import org.apache.shardingsphere.infra.binder.context.statement.SQLStatementContext;
+import org.apache.shardingsphere.infra.binder.engine.SQLBindEngine;
+import org.apache.shardingsphere.infra.exception.core.ShardingSpherePreconditions;
+import org.apache.shardingsphere.infra.exception.dialect.exception.syntax.database.NoDatabaseSelectedException;
 import org.apache.shardingsphere.infra.executor.sql.execute.result.query.QueryResult;
 import org.apache.shardingsphere.infra.executor.sql.execute.result.query.QueryResultMetaData;
 import org.apache.shardingsphere.infra.executor.sql.execute.result.query.impl.raw.metadata.RawQueryResultColumnMetaData;
 import org.apache.shardingsphere.infra.executor.sql.execute.result.query.impl.raw.metadata.RawQueryResultMetaData;
 import org.apache.shardingsphere.infra.executor.sql.execute.result.query.impl.raw.type.RawMemoryQueryResult;
 import org.apache.shardingsphere.infra.executor.sql.execute.result.query.type.memory.row.MemoryQueryResultDataRow;
+import org.apache.shardingsphere.infra.hint.HintValueContext;
+import org.apache.shardingsphere.infra.hint.SQLHintUtils;
 import org.apache.shardingsphere.infra.merge.result.MergedResult;
 import org.apache.shardingsphere.infra.merge.result.impl.transparent.TransparentMergedResult;
 import org.apache.shardingsphere.infra.session.query.QueryContext;
-import org.apache.shardingsphere.infra.exception.core.ShardingSpherePreconditions;
 import org.apache.shardingsphere.proxy.backend.connector.DatabaseConnector;
 import org.apache.shardingsphere.proxy.backend.connector.DatabaseConnectorFactory;
 import org.apache.shardingsphere.proxy.backend.context.ProxyContext;
@@ -41,7 +43,7 @@ import org.apache.shardingsphere.proxy.backend.response.header.ResponseHeader;
 import org.apache.shardingsphere.proxy.backend.response.header.query.QueryHeader;
 import org.apache.shardingsphere.proxy.backend.response.header.query.QueryResponseHeader;
 import org.apache.shardingsphere.proxy.backend.session.ConnectionSession;
-import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.SelectStatement;
+import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.GenericSelectStatement;
 
 import java.sql.SQLException;
 import java.sql.Types;
@@ -61,7 +63,7 @@ public final class UnicastResourceShowExecutor implements DatabaseAdminQueryExec
     
     private final DatabaseConnectorFactory databaseConnectorFactory = DatabaseConnectorFactory.getInstance();
     
-    private final SelectStatement sqlStatement;
+    private final GenericSelectStatement sqlStatement;
     
     private final String sql;
     
@@ -76,11 +78,12 @@ public final class UnicastResourceShowExecutor implements DatabaseAdminQueryExec
         String originDatabase = connectionSession.getDatabaseName();
         String databaseName = null == originDatabase ? getFirstDatabaseName() : originDatabase;
         ShardingSpherePreconditions.checkState(ProxyContext.getInstance().getContextManager().getDatabase(databaseName).containsDataSource(), () -> new StorageUnitNotExistedException(databaseName));
+        HintValueContext hintValueContext = SQLHintUtils.extractHint(sql);
         try {
             connectionSession.setCurrentDatabase(databaseName);
             SQLStatementContext sqlStatementContext = new SQLBindEngine(ProxyContext.getInstance().getContextManager().getMetaDataContexts().getMetaData(),
-                    connectionSession.getDefaultDatabaseName()).bind(sqlStatement, Collections.emptyList());
-            databaseConnector = databaseConnectorFactory.newInstance(new QueryContext(sqlStatementContext, sql, Collections.emptyList()),
+                    connectionSession.getDefaultDatabaseName(), hintValueContext).bind(sqlStatement, Collections.emptyList());
+            databaseConnector = databaseConnectorFactory.newInstance(new QueryContext(sqlStatementContext, sql, Collections.emptyList(), hintValueContext),
                     connectionSession.getDatabaseConnectionManager(), false);
             responseHeader = databaseConnector.execute();
             mergedResult = new TransparentMergedResult(createQueryResult());

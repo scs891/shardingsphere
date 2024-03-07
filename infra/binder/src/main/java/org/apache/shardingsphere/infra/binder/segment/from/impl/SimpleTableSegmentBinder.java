@@ -71,9 +71,9 @@ public final class SimpleTableSegmentBinder {
     /**
      * Bind simple table segment with metadata.
      *
-     * @param segment                simple table segment
+     * @param segment simple table segment
      * @param statementBinderContext statement binder context
-     * @param tableBinderContexts    table binder contexts
+     * @param tableBinderContexts table binder contexts
      * @return bounded simple table segment
      */
     public static SimpleTableSegment bind(final SimpleTableSegment segment, final SQLStatementBinderContext statementBinderContext, final Map<String, TableSegmentBinderContext> tableBinderContexts) {

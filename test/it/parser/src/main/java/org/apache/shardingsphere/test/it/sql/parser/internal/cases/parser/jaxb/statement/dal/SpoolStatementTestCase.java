@@ -15,29 +15,21 @@
  * limitations under the License.
  */
 
-package org.apache.shardingsphere.sql.parser.sql.dialect.statement.sql92.dml;
+package org.apache.shardingsphere.test.it.sql.parser.internal.cases.parser.jaxb.statement.dal;
 
+import lombok.Getter;
 import lombok.Setter;
-import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.pagination.limit.LimitSegment;
-import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.SelectStatement;
-import org.apache.shardingsphere.sql.parser.sql.dialect.statement.sql92.SQL92Statement;
+import org.apache.shardingsphere.test.it.sql.parser.internal.cases.parser.jaxb.SQLParserTestCase;
 
-import java.util.Optional;
+import javax.xml.bind.annotation.XmlAttribute;
 
 /**
- * SQL92 select statement.
+ * Spool statement test case.
  */
+@Getter
 @Setter
-public final class SQL92SelectStatement extends SelectStatement implements SQL92Statement {
+public final class SpoolStatementTestCase extends SQLParserTestCase {
     
-    private LimitSegment limit;
-    
-    /**
-     * Get order by segment.
-     *
-     * @return order by segment
-     */
-    public Optional<LimitSegment> getLimit() {
-        return Optional.ofNullable(limit);
-    }
+    @XmlAttribute
+    private String filename;
 }

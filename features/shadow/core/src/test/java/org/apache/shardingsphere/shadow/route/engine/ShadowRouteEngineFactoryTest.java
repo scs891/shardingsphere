@@ -17,6 +17,7 @@
 
 package org.apache.shardingsphere.shadow.route.engine;
 
+import org.apache.shardingsphere.infra.hint.HintValueContext;
 import org.apache.shardingsphere.infra.session.query.QueryContext;
 import org.apache.shardingsphere.infra.binder.context.statement.SQLStatementContext;
 import org.apache.shardingsphere.infra.binder.context.statement.dml.DeleteStatementContext;
@@ -29,7 +30,7 @@ import org.apache.shardingsphere.shadow.route.engine.dml.ShadowSelectStatementRo
 import org.apache.shardingsphere.shadow.route.engine.dml.ShadowUpdateStatementRoutingEngine;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.DeleteStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.InsertStatement;
-import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.SelectStatement;
+import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.GenericSelectStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.UpdateStatement;
 import org.junit.jupiter.api.Test;
 
@@ -45,13 +46,13 @@ class ShadowRouteEngineFactoryTest {
     
     @Test
     void assertNewInstance() {
-        ShadowRouteEngine shadowInsertRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createInsertSqlStatementContext(), "", Collections.emptyList()));
+        ShadowRouteEngine shadowInsertRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createInsertSqlStatementContext(), "", Collections.emptyList(), new HintValueContext()));
         assertThat(shadowInsertRouteEngine, instanceOf(ShadowInsertStatementRoutingEngine.class));
-        ShadowRouteEngine shadowUpdateRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createUpdateSqlStatementContext(), "", Collections.emptyList()));
+        ShadowRouteEngine shadowUpdateRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createUpdateSqlStatementContext(), "", Collections.emptyList(), new HintValueContext()));
         assertThat(shadowUpdateRouteEngine, instanceOf(ShadowUpdateStatementRoutingEngine.class));
-        ShadowRouteEngine shadowDeleteRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createDeleteSqlStatementContext(), "", Collections.emptyList()));
+        ShadowRouteEngine shadowDeleteRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createDeleteSqlStatementContext(), "", Collections.emptyList(), new HintValueContext()));
         assertThat(shadowDeleteRouteEngine, instanceOf(ShadowDeleteStatementRoutingEngine.class));
-        ShadowRouteEngine shadowSelectRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createSelectSqlStatementContext(), "", Collections.emptyList()));
+        ShadowRouteEngine shadowSelectRouteEngine = ShadowRouteEngineFactory.newInstance(new QueryContext(createSelectSqlStatementContext(), "", Collections.emptyList(), new HintValueContext()));
         assertThat(shadowSelectRouteEngine, instanceOf(ShadowSelectStatementRoutingEngine.class));
     }
     
@@ -75,7 +76,7 @@ class ShadowRouteEngineFactoryTest {
     
     private SQLStatementContext createSelectSqlStatementContext() {
         SelectStatementContext result = mock(SelectStatementContext.class, RETURNS_DEEP_STUBS);
-        when(result.getSqlStatement()).thenReturn(mock(SelectStatement.class));
+        when(result.getSqlStatement()).thenReturn(mock(GenericSelectStatement.class));
         return result;
     }
 }

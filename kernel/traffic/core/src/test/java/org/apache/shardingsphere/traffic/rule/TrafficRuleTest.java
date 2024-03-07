@@ -23,14 +23,14 @@ import org.apache.shardingsphere.infra.binder.context.statement.SQLStatementCont
 import org.apache.shardingsphere.infra.binder.context.statement.dml.SelectStatementContext;
 import org.apache.shardingsphere.infra.config.props.ConfigurationProperties;
 import org.apache.shardingsphere.infra.database.core.DefaultDatabase;
+import org.apache.shardingsphere.infra.hint.HintValueContext;
 import org.apache.shardingsphere.infra.metadata.ShardingSphereMetaData;
 import org.apache.shardingsphere.infra.metadata.database.ShardingSphereDatabase;
 import org.apache.shardingsphere.infra.metadata.database.resource.ResourceMetaData;
 import org.apache.shardingsphere.infra.metadata.database.rule.RuleMetaData;
 import org.apache.shardingsphere.infra.session.query.QueryContext;
 import org.apache.shardingsphere.sql.parser.sql.common.segment.dml.item.ProjectionsSegment;
-import org.apache.shardingsphere.sql.parser.sql.common.segment.generic.CommentSegment;
-import org.apache.shardingsphere.sql.parser.sql.dialect.statement.mysql.dml.MySQLSelectStatement;
+import org.apache.shardingsphere.sql.parser.sql.dialect.statement.mysql.dml.MySQLGenericSelectStatement;
 import org.apache.shardingsphere.test.util.PropertiesBuilder;
 import org.apache.shardingsphere.test.util.PropertiesBuilder.Property;
 import org.apache.shardingsphere.traffic.algorithm.traffic.hint.SQLHintTrafficAlgorithm;
@@ -88,12 +88,13 @@ class TrafficRuleTest {
     }
     
     private QueryContext createQueryContext(final boolean includeComments) {
-        MySQLSelectStatement sqlStatement = mock(MySQLSelectStatement.class);
-        when(sqlStatement.getCommentSegments()).thenReturn(includeComments ? Collections.singleton(new CommentSegment("/* SHARDINGSPHERE_HINT: USE_TRAFFIC=true */", 0, 0)) : Collections.emptyList());
+        MySQLGenericSelectStatement sqlStatement = mock(MySQLGenericSelectStatement.class);
         when(sqlStatement.getProjections()).thenReturn(new ProjectionsSegment(0, 0));
         SQLStatementContext statementContext =
                 new SelectStatementContext(createShardingSphereMetaData(mockDatabase()), Collections.emptyList(), sqlStatement, DefaultDatabase.LOGIC_NAME);
-        return new QueryContext(statementContext, "", Collections.emptyList());
+        HintValueContext hintValueContext = new HintValueContext();
+        hintValueContext.setUseTraffic(includeComments);
+        return new QueryContext(statementContext, "", Collections.emptyList(), hintValueContext);
     }
     
     private ShardingSphereDatabase mockDatabase() {

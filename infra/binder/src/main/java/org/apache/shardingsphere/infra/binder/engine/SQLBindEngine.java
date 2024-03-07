@@ -27,16 +27,14 @@ import org.apache.shardingsphere.infra.binder.statement.dml.MergeStatementBinder
 import org.apache.shardingsphere.infra.binder.statement.dml.SelectStatementBinder;
 import org.apache.shardingsphere.infra.binder.statement.dml.UpdateStatementBinder;
 import org.apache.shardingsphere.infra.hint.HintValueContext;
-import org.apache.shardingsphere.infra.hint.SQLHintUtils;
 import org.apache.shardingsphere.infra.metadata.ShardingSphereMetaData;
-import org.apache.shardingsphere.sql.parser.sql.common.statement.AbstractSQLStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.SQLStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.ddl.DDLStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.DMLStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.DeleteStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.InsertStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.MergeStatement;
-import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.SelectStatement;
+import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.GenericSelectStatement;
 import org.apache.shardingsphere.sql.parser.sql.common.statement.dml.UpdateStatement;
 import org.apache.shardingsphere.sql.parser.sql.dialect.statement.opengauss.ddl.OpenGaussCursorStatement;
 
@@ -54,12 +52,6 @@ public final class SQLBindEngine {
     
     private final HintValueContext hintValueContext;
     
-    public SQLBindEngine(final ShardingSphereMetaData metaData, final String defaultDatabaseName) {
-        this.metaData = metaData;
-        this.defaultDatabaseName = defaultDatabaseName;
-        this.hintValueContext = new HintValueContext();
-    }
-    
     /**
      * Bind SQL statement with metadata.
      *
@@ -73,7 +65,7 @@ public final class SQLBindEngine {
     }
     
     private SQLStatement bind(final SQLStatement statement, final ShardingSphereMetaData metaData, final String defaultDatabaseName) {
-        if (containsDataSourceNameSQLHint(hintValueContext, statement)) {
+        if (hintValueContext.findHintDataSourceName().isPresent()) {
             return statement;
         }
         if (statement instanceof DMLStatement) {
@@ -85,19 +77,9 @@ public final class SQLBindEngine {
         return statement;
     }
     
-    private boolean containsDataSourceNameSQLHint(final HintValueContext hintValueContext, final SQLStatement sqlStatement) {
-        if (hintValueContext.findHintDataSourceName().isPresent()) {
-            return true;
-        }
-        if (sqlStatement instanceof AbstractSQLStatement && !((AbstractSQLStatement) sqlStatement).getCommentSegments().isEmpty()) {
-            return SQLHintUtils.extractHint(((AbstractSQLStatement) sqlStatement).getCommentSegments().iterator().next().getText()).flatMap(HintValueContext::findHintDataSourceName).isPresent();
-        }
-        return false;
-    }
-    
     private static SQLStatement bindDMLStatement(final SQLStatement statement, final ShardingSphereMetaData metaData, final String defaultDatabaseName) {
-        if (statement instanceof SelectStatement) {
-            return new SelectStatementBinder().bind((SelectStatement) statement, metaData, defaultDatabaseName);
+        if (statement instanceof GenericSelectStatement) {
+            return new SelectStatementBinder().bind((GenericSelectStatement) statement, metaData, defaultDatabaseName);
         }
         if (statement instanceof InsertStatement) {
             return new InsertStatementBinder().bind((InsertStatement) statement, metaData, defaultDatabaseName);
